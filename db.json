@@ -1,0 +1,17 @@
+{
+  "1": {
+    "name": "Dr. Rakib Hasan",
+    "referencePhotoUrl": "/photos/dr_rakib.jpg",
+    "passwordHash": "$2a$10$LCGGG2ZwHt0HeOjDcH.FhethN9WQTHWZ83ru7.30Oqc6OW0Zmh9ay"
+  },
+  "2": {
+    "name": "Dr. Ashikul Islam",
+    "referencePhotoUrl": "/photos/dr_ashik.jpg",
+    "passwordHash": null
+  },
+  "3": {
+    "name": "Dr. Maliha Rahman",
+    "referencePhotoUrl": "/photos/dr_maliha.jpg",
+    "passwordHash": null
+  }
+}

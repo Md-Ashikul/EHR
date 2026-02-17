@@ -1,0 +1,23 @@
+import { ethers } from "ethers";
+import { contractAddress, contractABI, providerUrl } from '../../lib/constants';
+
+export default async function handler(req, res) {
+    if (req.method !== "POST") return res.status(405).json({ error: "Method not allowed" });
+    
+    const { patientId, doctorId, patientPrivateKey } = req.body;
+
+    try {
+        const provider = new ethers.JsonRpcProvider(providerUrl);
+        // In production, use the connected wallet (MetaMask) on frontend. 
+        // Here we use the private key passed from the UI for the demo.
+        const wallet = new ethers.Wallet(patientPrivateKey, provider); 
+        const contract = new ethers.Contract(contractAddress, contractABI, wallet);
+
+        const tx = await contract.giveAccess(patientId, doctorId);
+        await tx.wait();
+
+        res.status(200).json({ success: true, message: "Access granted successfully" });
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+}
