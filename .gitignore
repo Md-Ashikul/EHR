@@ -8,7 +8,7 @@ cache/
 
 # Next.js build and development logs
 .next/
-**/ .next/
+**/.next/
 out/
 .env*.local
 
