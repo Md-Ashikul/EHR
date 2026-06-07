@@ -217,5 +217,3 @@ Contributions are welcome! Please feel free to submit a Pull Request.
 For issues and questions, please create an issue in the GitHub repository.
 
 ---
-
-**Note**: This is a blockchain-based application for managing healthcare records. Ensure all transactions are tested thoroughly on the local network before deploying to any public blockchain.
