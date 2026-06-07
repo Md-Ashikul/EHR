@@ -1,19 +1,46 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/router";
 
 export default function UploadDocument() {
   const router = useRouter();
-  const { doctorId, patientId: qPid } = router.query;
-  const [patientId, setPatientId] = useState(qPid || "");
+  
+  const [patientId, setPatientId] = useState("");
+  const [doctorId, setDoctorId] = useState("");
   const [diseaseName, setDiseaseName] = useState("");
   const [description, setDescription] = useState("");
   const [imageFile, setImageFile] = useState(null);
   const [message, setMessage] = useState("");
 
+  // --- THE FIX: Safely retrieve IDs after page load ---
+  useEffect(() => {
+    // 1. Get Doctor ID from Local Storage (Survives page reloads)
+    const storedDoctorId = localStorage.getItem("doctorId");
+    
+    // 2. Safely extract parameters from Next.js router once ready
+    if (router.isReady) {
+      const urlDoctorId = router.query.doctorId;
+      const urlPatientId = router.query.patientId;
+
+      // Prefer Local Storage for Doctor ID, fallback to URL
+      if (storedDoctorId) setDoctorId(storedDoctorId);
+      else if (urlDoctorId) setDoctorId(urlDoctorId);
+
+      // Set Patient ID if it came from the URL
+      if (urlPatientId) setPatientId(urlPatientId);
+    }
+  }, [router.isReady, router.query]);
+
   const handleImageChange = (e) => setImageFile(e.target.files[0]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    
+    // Final safety check before hitting API
+    if (!doctorId) {
+      setMessage("Error: Doctor session lost. Please login again.");
+      return;
+    }
+
     setMessage("Uploading...");
     
     const reader = new FileReader();
@@ -42,7 +69,7 @@ export default function UploadDocument() {
         <textarea placeholder="Description" value={description} onChange={e=>setDescription(e.target.value)} className="w-full p-2 border rounded" />
         <input type="file" onChange={handleImageChange} className="w-full" />
         <button type="submit" className="w-full bg-teal-600 text-white py-2 rounded">Upload</button>
-        {message && <p className="text-sm mt-2">{message}</p>}
+        {message && <p className={`text-sm mt-2 ${message.includes("Error") ? "text-red-600" : "text-green-600"}`}>{message}</p>}
       </form>
     </div>
   );

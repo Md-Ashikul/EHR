@@ -18,7 +18,7 @@ contract DoctorPatient {
     struct Document {
         uint256 patientId;
         uint256 doctorId;
-        string cid; // Re-using for general CID (as in your original API)
+        string cid; 
         string diseaseName;
         string description;
         string imageCID;
@@ -31,9 +31,6 @@ contract DoctorPatient {
     mapping(uint256 => uint256[]) public doctorPatients; // Doctors to their patients
     mapping(uint256 => string) public validDoctors; // Pre-registration data
 
-    uint256 public doctorIdCounter;
-    uint256 public patientIdCounter = 0;
-
     event DoctorRegistered(uint256 doctorId, string name, address wallet);
     event PatientRegistered(uint256 patientId, string name, address wallet);
     event DocumentUploaded(uint256 patientId, uint256 doctorId, string cid, string diseaseName, uint256 timestamp);
@@ -42,12 +39,11 @@ contract DoctorPatient {
     event AccessRevoked(uint256 patientId, uint256 doctorId);
 
     // Register doctor data (for pre-verification)
-    // In our new flow, the API will call this, not the admin.
     function registerDoctorData(uint256 _id, string memory _name) public {
         validDoctors[_id] = _name;
     }
 
-    // Register a doctor
+    // Register a doctor (FIXED: Uses exact _id from frontend)
     function registerDoctor(string memory _name, uint256 _id, address _wallet) public {
         // Check if the doctor's data is valid (pre-registered)
         require(
@@ -55,22 +51,29 @@ contract DoctorPatient {
             "Doctor ID or name is invalid"
         );
         
-        doctorIdCounter++;
-        doctors[doctorIdCounter] = Doctor(doctorIdCounter, _name, _wallet);
+        // Ensure this ID hasn't already been registered
+        require(doctors[_id].id == 0, "Doctor already registered at this ID");
         
-        emit DoctorRegistered(doctorIdCounter, _name, _wallet);
+        // Maps the doctor to the exact ID provided
+        doctors[_id] = Doctor(_id, _name, _wallet);
+        
+        emit DoctorRegistered(_id, _name, _wallet);
     }
 
-    // Register a patient
-    function registerPatient(string memory _name, address _wallet) public {
-        patientIdCounter++;
-        patients[patientIdCounter] = Patient(
-            patientIdCounter,
-            _name,
-            _wallet,
+    // Register a patient (FIXED: Uses exact _id from frontend)
+    function registerPatient(uint256 _id, string memory _name, address _wallet) public {
+        // Ensure this ID hasn't already been registered
+        require(patients[_id].id == 0, "Patient already registered at this ID");
+        
+        // Maps the patient to the exact ID provided
+        patients[_id] = Patient(
+            _id, 
+            _name, 
+            _wallet, 
             new uint256[](0)
         );
-        emit PatientRegistered(patientIdCounter, _name, _wallet);
+        
+        emit PatientRegistered(_id, _name, _wallet);
     }
 
     // Upload a document
@@ -129,11 +132,7 @@ contract DoctorPatient {
     }
 
     // Get patient documents (for the patient)
-    function getPatientDocuments(uint256 _patientId)
-        public
-        view
-        returns (Document[] memory)
-    {
+    function getPatientDocuments(uint256 _patientId) public view returns (Document[] memory) {
         // Only the patient can see all their documents
         require(
             msg.sender == patients[_patientId].wallet,
@@ -143,10 +142,7 @@ contract DoctorPatient {
     }
 
     // Get patient documents (for an authorized doctor)
-    function getPateintDocumentsByDoctor(
-        uint256 _patientId,
-        uint256 _doctorId
-    ) public view returns (Document[] memory) {
+    function getPateintDocumentsByDoctor(uint256 _patientId, uint256 _doctorId) public view returns (Document[] memory) {
         require(
             isDoctorAuthorized(_patientId, _doctorId),
             "Doctor is not authorized"
@@ -156,7 +152,10 @@ contract DoctorPatient {
     
     // Helper function for patient dashboard
     function getPatientDoctorAccess(uint256 _patientId) public view returns (uint256[] memory) {
-        require(msg.sender == patients[_patientId].wallet, "Only patient can view access list");
+        require(
+            msg.sender == patients[_patientId].wallet, 
+            "Only patient can view access list"
+        );
         return patients[_patientId].doctorAccess;
     }
 
@@ -209,16 +208,8 @@ contract DoctorPatient {
     }
 
     // Check if a doctor is authorized
-    function isDoctorAuthorized(uint256 _patientId, uint256 _doctorId)
-        public
-        view
-        returns (bool)
-    {
-        for (
-            uint256 i = 0;
-            i < patients[_patientId].doctorAccess.length;
-            i++
-        ) {
+    function isDoctorAuthorized(uint256 _patientId, uint256 _doctorId) public view returns (bool) {
+        for (uint256 i = 0; i < patients[_patientId].doctorAccess.length; i++) {
             if (patients[_patientId].doctorAccess[i] == _doctorId) {
                 return true;
             }
@@ -233,16 +224,8 @@ contract DoctorPatient {
     }
 
     // Helper to find doctor index for removal
-    function findDoctorIndex(uint256 _patientId, uint256 _doctorId)
-        private
-        view
-        returns (uint256)
-    {
-        for (
-            uint256 i = 0;
-            i < patients[_patientId].doctorAccess.length;
-            i++
-        ) {
+    function findDoctorIndex(uint256 _patientId, uint256 _doctorId) private view returns (uint256) {
+        for (uint256 i = 0; i < patients[_patientId].doctorAccess.length; i++) {
             if (patients[_patientId].doctorAccess[i] == _doctorId) {
                 return i;
             }

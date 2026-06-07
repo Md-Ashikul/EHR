@@ -1,0 +1,17 @@
+# Dependencies
+node_modules/
+**/node_modules/
+
+# Hardhat / Solidity smart contract artifacts
+artifacts/
+cache/
+
+# Next.js build and development logs
+.next/
+**/ .next/
+out/
+.env*.local
+
+# Local mockup or state databases
+db.json
+patients.json

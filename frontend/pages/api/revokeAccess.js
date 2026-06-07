@@ -6,12 +6,16 @@ export default async function handler(req, res) {
 
     const { patientId, doctorId, patientPrivateKey } = req.body;
 
+    // THE FIX: Parse to Integers
+    const pId = parseInt(patientId, 10);
+    const dId = parseInt(doctorId, 10);
+
     try {
         const provider = new ethers.JsonRpcProvider(providerUrl);
         const wallet = new ethers.Wallet(patientPrivateKey, provider);
         const contract = new ethers.Contract(contractAddress, contractABI, wallet);
 
-        let tx = await contract.revokeAccess(patientId, doctorId);
+        let tx = await contract.revokeAccess(pId, dId);
         await tx.wait();
 
         res.status(200).json({ success: true, message: "Access revoked successfully" });

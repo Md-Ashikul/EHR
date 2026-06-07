@@ -19,6 +19,10 @@ export default function LoginDoctor() {
       if (data.error) {
         setError(data.error);
       } else {
+        // --- THE FIX: Save to browser memory so it's never lost ---
+        localStorage.setItem("doctorId", data.doctorId);
+        localStorage.setItem("doctorName", data.doctorName);
+        
         // Redirect to dashboard
         router.push({
           pathname: "/doctorDashboard",

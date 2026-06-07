@@ -22,6 +22,21 @@ const initialData = {
     referencePhotoUrl: "/photos/dr_maliha.jpg",
     passwordHash: null,
   },
+  4: {
+    name: "Dr. Saqiul Islam",
+    referencePhotoUrl: "/photos/dr_saqi.jpg",
+    passwordHash: null,
+  }, 
+  5: {
+    name: "Dr. Mezbah Uddin",
+    referencePhotoUrl: "/photos/dr_mezbah.jpg",
+    passwordHash: null,
+  }, 
+  6: {
+    name: "Dr. Arman Sarkar",
+    referencePhotoUrl: "/photos/dr_arman.jpg",
+    passwordHash: null,
+  }
 };
 
 // Function to read the database

@@ -1,23 +1,34 @@
-import { ethers } from "ethers";
-import { contractAddress, contractABI, providerUrl } from '../../lib/constants';
+import { readDoctorDB } from '../../lib/db-handler';
 
 export default async function handler(req, res) {
-    try {
-      const provider = new ethers.JsonRpcProvider(providerUrl);
-      const contract = new ethers.Contract(contractAddress, contractABI, provider);
-      const doctorCount = await contract.doctorIdCounter();
-      const doctors = [];
+    if (req.method !== 'GET') {
+        return res.status(405).json({ error: 'Method not allowed' });
+    }
 
-      for (let i = 1; i <= doctorCount; i++) {
-        const doctor = await contract.doctors(i);
-        doctors.push({
-          id: Number(doctor[0]),
-          name: doctor[1],
-          wallet: doctor[2],
-        });
-      }
-      res.status(200).json(doctors);
+    try {
+        const doctorDatabase = readDoctorDB();
+        
+        // Convert the dictionary { "1": {...} } into an array with IDs included
+        const allDoctors = Object.keys(doctorDatabase).map(key => ({
+            id: parseInt(key, 10),
+            ...doctorDatabase[key]
+        }));
+
+        // Filter only doctors who have completed registration (have a wallet)
+        const registeredDoctors = allDoctors.filter(
+            (d) => d.wallet !== null && d.wallet !== undefined && d.wallet !== ""
+        );
+        
+        // Format for the frontend dropdown
+        const formattedDoctors = registeredDoctors.map(doc => ({
+            id: doc.id,
+            name: doc.name,
+            wallet: doc.wallet
+        }));
+
+        res.status(200).json(formattedDoctors);
     } catch (error) {
-      res.status(500).json({ error: "Error fetching doctors" });
+        console.error("Error fetching doctors:", error);
+        res.status(500).json({ error: "Error fetching doctors from database" });
     }
 }

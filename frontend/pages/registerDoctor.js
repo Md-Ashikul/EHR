@@ -95,7 +95,7 @@ export default function RegisterDoctor() {
   };
 
   // ------------------------------------------------
-  // 3. LIVENESS CHECK (The "Smile" Test)
+  // 3. LIVENESS CHECK (The "Smile" Test) - UPDATED WITH METRICS
   // ------------------------------------------------
   const startLivenessCheck = () => {
     if (!modelsLoaded) return;
@@ -108,16 +108,29 @@ export default function RegisterDoctor() {
 
       const video = webcamRef.current.video;
 
+      // --- [METRIC START] Start Timer ---
+      const t0 = performance.now();
+
       // Detect face AND expressions
       const detections = await faceapi.detectSingleFace(video)
         .withFaceLandmarks()
         .withFaceExpressions();
 
+      // --- [METRIC END] Stop Timer ---
+      const t1 = performance.now();
+
       if (detections) {
+        // 1. Calculate Metrics
+        const inferenceTime = (t1 - t0).toFixed(2); // Time in milliseconds
+        const score = (detections.detection.score * 100).toFixed(2); // Confidence %
+
+        // 2. Log to Console (Check F12 Developer Tools for this data!)
+        console.log(`[METRIC] AI Inference Time: ${inferenceTime} ms`);
+        console.log(`[METRIC] Face Confidence Score: ${score}%`);
+
         // 'happy' returns a confidence score (0 to 1)
         const smileScore = detections.expressions.happy;
-        console.log("Smile Score:", smileScore);
-
+        
         // Threshold: 0.7 means very likely smiling
         if (smileScore > 0.7) {
           clearInterval(interval);

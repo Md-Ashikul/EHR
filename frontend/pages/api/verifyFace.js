@@ -9,6 +9,9 @@ export default async function handler(req, res) {
   const doctorDatabase = readDoctorDB(); // ADDED
 
   try {
+    console.log("--- STARTING AI BIOMETRIC METRICS ---");
+    const t_start = performance.now(); // Start Timer
+
     // 1. Basic validation
     if (!doctorId || !image) {
       return res.status(400).json({ error: 'Missing doctor ID or image data.' });
@@ -22,17 +25,24 @@ export default async function handler(req, res) {
     }
 
     // 2. Simulate AI Face Verification Logic
-    // In a real app, you would compare 'image' (base64) with 'doctor.referencePhotoUrl'
     console.log(`Simulating face verification for Dr. ${doctor.name}...`);
     
     // Simulate a 2-second processing delay (like a real AI service)
     await new Promise(resolve => setTimeout(resolve, 2000));
 
+    const t_end = performance.now(); // End Timer
+    const aiLatency = (t_end - t_start).toFixed(2);
+    
+    console.log(`[METRIC] AI Verification Latency: ${aiLatency} ms`);
+    console.log("---------------------------------------");
+
     // 3. Success Response
-    // We assume the face matches for this demo
     res.status(200).json({ 
       verified: true, 
-      message: 'Face verification successful.' 
+      message: 'Face verification successful.',
+      metrics: {
+        aiLatency // Sending latency to the frontend as well
+      }
     });
 
   } catch (error) {
