@@ -1,20 +1,26 @@
 import { readDoctorDB } from '../../lib/db-handler';
+import { loadModels, ensureModelsLoaded, bufferToImage, getFaceDescriptor, compareFaces, faceapi } from '../../lib/face-api-server';
+import path from 'path';
+import fs from 'fs';
+
+// Global flag to load models only once
+let modelsInitialized = false;
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
-  const { doctorId, image } = req.body;
-  const doctorDatabase = readDoctorDB(); // ADDED
+  const { doctorId, referencePhotoUrl, liveImageBase64 } = req.body;
+  const doctorDatabase = readDoctorDB();
 
   try {
-    console.log("--- STARTING AI BIOMETRIC METRICS ---");
-    const t_start = performance.now(); // Start Timer
+    console.log("--- STARTING REAL AI BIOMETRIC VERIFICATION ---");
+    const t_start = performance.now();
 
     // 1. Basic validation
-    if (!doctorId || !image) {
-      return res.status(400).json({ error: 'Missing doctor ID or image data.' });
+    if (!doctorId || !referencePhotoUrl || !liveImageBase64) {
+      return res.status(400).json({ error: 'Missing doctor ID, reference photo, or live image.' });
     }
 
     const id = parseInt(doctorId, 10);
@@ -24,29 +30,123 @@ export default async function handler(req, res) {
       return res.status(404).json({ error: 'Doctor not found.' });
     }
 
-    // 2. Simulate AI Face Verification Logic
-    console.log(`Simulating face verification for Dr. ${doctor.name}...`);
-    
-    // Simulate a 2-second processing delay (like a real AI service)
-    await new Promise(resolve => setTimeout(resolve, 2000));
-
-    const t_end = performance.now(); // End Timer
-    const aiLatency = (t_end - t_start).toFixed(2);
-    
-    console.log(`[METRIC] AI Verification Latency: ${aiLatency} ms`);
-    console.log("---------------------------------------");
-
-    // 3. Success Response
-    res.status(200).json({ 
-      verified: true, 
-      message: 'Face verification successful.',
-      metrics: {
-        aiLatency // Sending latency to the frontend as well
+    // 2. Load AI Models (first time only)
+    if (!modelsInitialized) {
+      try {
+        const MODEL_URL = path.join(process.cwd(), 'public', 'models');
+        console.log("[AI] Loading face-api models...");
+        await loadModels(MODEL_URL);
+        modelsInitialized = true;
+      } catch (modelErr) {
+        console.error("[AI ERROR]", modelErr.message);
+        return res.status(500).json({ error: 'Failed to load AI models. Ensure models are in public/models/' });
       }
-    });
+    }
+
+    // 3. Ensure models are ready
+    ensureModelsLoaded();
+
+    // 4. Load Reference Photo from filesystem
+    const refPhotoPath = path.join(process.cwd(), 'public', referencePhotoUrl.replace(/^\//, ''));
+    
+    if (!fs.existsSync(refPhotoPath)) {
+      return res.status(404).json({ error: `Reference photo not found at ${refPhotoPath}` });
+    }
+
+    const refImageBuffer = fs.readFileSync(refPhotoPath);
+    const refImage = bufferToImage(refImageBuffer);
+
+    // 5. Convert Live Image from Base64
+    const base64Data = liveImageBase64.replace(/^data:image\/\w+;base64,/, '');
+    const liveImageBuffer = Buffer.from(base64Data, 'base64');
+    const liveImage = bufferToImage(liveImageBuffer);
+
+    // 6. Compute Face Descriptors
+    console.log(`[AI] Computing descriptor for reference photo...`);
+    const t_refStart = performance.now();
+    
+    const refDetection = await getFaceDescriptor(refImage);
+
+    const t_refEnd = performance.now();
+    const refComputeTime = (t_refEnd - t_refStart).toFixed(2);
+
+    if (!refDetection) {
+      return res.status(400).json({ 
+        error: 'No face detected in reference photo. Admin must update the reference photo.',
+        verified: false
+      });
+    }
+
+    console.log(`[AI] Computing descriptor for live image...`);
+    const t_liveStart = performance.now();
+    
+    const liveDetection = await getFaceDescriptor(liveImage);
+
+    const t_liveEnd = performance.now();
+    const liveComputeTime = (t_liveEnd - t_liveStart).toFixed(2);
+
+    if (!liveDetection) {
+      return res.status(400).json({ 
+        error: 'No face detected in live image. Please position your face clearly.',
+        verified: false
+      });
+    }
+
+    // 7. Compare Descriptors
+    console.log(`[AI] Comparing face descriptors...`);
+    const THRESHOLD = 0.6;
+    const comparison = compareFaces(refDetection.descriptor, liveDetection.descriptor, THRESHOLD);
+
+    const refFaceScore = (refDetection.detection.score * 100).toFixed(2);
+    const liveFaceScore = (liveDetection.detection.score * 100).toFixed(2);
+
+    // 8. Calculate Metrics
+    const t_end = performance.now();
+    const totalLatency = (t_end - t_start).toFixed(2);
+
+    // Log comprehensive metrics
+    console.log(`[METRIC] Reference Face Confidence: ${refFaceScore}%`);
+    console.log(`[METRIC] Live Face Confidence: ${liveFaceScore}%`);
+    console.log(`[METRIC] Reference Descriptor Compute Time: ${refComputeTime} ms`);
+    console.log(`[METRIC] Live Descriptor Compute Time: ${liveComputeTime} ms`);
+    console.log(`[METRIC] Euclidean Distance: ${comparison.distance.toFixed(4)}`);
+    console.log(`[METRIC] Match Threshold: ${THRESHOLD}`);
+    console.log(`[METRIC] Is Match: ${comparison.isMatch}`);
+    console.log(`[METRIC] Match Confidence: ${comparison.confidence}%`);
+    console.log(`[METRIC] Total AI Latency: ${totalLatency} ms`);
+    console.log("----------------------------------------------");
+
+    // 9. Return Result
+    if (comparison.isMatch) {
+      res.status(200).json({ 
+        verified: true, 
+        message: 'Face biometric match successful!',
+        metrics: {
+          euclideanDistance: comparison.distance.toFixed(4),
+          matchConfidence: comparison.confidence,
+          refFaceScore,
+          liveFaceScore,
+          refComputeTime,
+          liveComputeTime,
+          totalLatency
+        }
+      });
+    } else {
+      res.status(400).json({ 
+        verified: false, 
+        error: `Face does not match. Distance: ${comparison.distance.toFixed(4)} (threshold: ${THRESHOLD})`,
+        metrics: {
+          euclideanDistance: comparison.distance.toFixed(4),
+          matchConfidence: comparison.confidence,
+          refFaceScore,
+          liveFaceScore,
+          totalLatency
+        }
+      });
+    }
 
   } catch (error) {
     console.error('Error in verifyFace:', error);
-    res.status(500).json({ error: 'Face verification failed.' });
+    res.status(500).json({ error: 'Face verification failed.', details: error.message });
   }
 }

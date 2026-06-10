@@ -10,10 +10,12 @@
   },
   "dependencies": {
     "bcryptjs": "^2.4.3",
+    "canvas": "^3.2.3",
     "ethers": "^6.13.5",
     "face-api.js": "^0.22.2",
     "ipfs-http-client": "^60.0.1",
     "next": "15.1.7",
+    "node-fetch": "^2.7.0",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
     "react-webcam": "^7.2.0"

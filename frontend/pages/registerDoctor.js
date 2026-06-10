@@ -125,8 +125,8 @@ export default function RegisterDoctor() {
         const score = (detections.detection.score * 100).toFixed(2); // Confidence %
 
         // 2. Log to Console (Check F12 Developer Tools for this data!)
-        console.log(`[METRIC] AI Inference Time: ${inferenceTime} ms`);
-        console.log(`[METRIC] Face Confidence Score: ${score}%`);
+        console.log(`[v0] LIVENESS - AI Inference Time: ${inferenceTime} ms`);
+        console.log(`[v0] LIVENESS - Face Confidence Score: ${score}%`);
 
         // 'happy' returns a confidence score (0 to 1)
         const smileScore = detections.expressions.happy;
@@ -136,6 +136,7 @@ export default function RegisterDoctor() {
           clearInterval(interval);
           setLivenessInterval(null);
           setIsLive(true);
+          console.log(`[v0] LIVENESS - Smile detected! Score: ${(smileScore * 100).toFixed(2)}%`);
           setVerificationMessage("Smile Detected! Verifying biometric match...");
           
           // IMMEDIATELY proceed to biometric verification
@@ -148,54 +149,53 @@ export default function RegisterDoctor() {
   };
 
   // ------------------------------------------------
-  // 4. BIOMETRIC VERIFICATION (Face Match)
+  // 4. BIOMETRIC VERIFICATION (Face Match with Backend AI)
   // ------------------------------------------------
   const verifyBiometrics = async (videoElement) => {
     setLoading(true);
     try {
-      // A. Load Reference Photo (from DB)
-      const refImageEl = document.createElement('img');
-      refImageEl.src = referencePhoto;
-      // Wait for it to load in memory
-      await new Promise((resolve, reject) => { 
-          refImageEl.onload = resolve; 
-          refImageEl.onerror = () => reject("Could not load reference photo from DB");
+      // A. Capture live image from video as Base64
+      const canvas = document.createElement('canvas');
+      canvas.width = videoElement.videoWidth;
+      canvas.height = videoElement.videoHeight;
+      const ctx = canvas.getContext('2d');
+      ctx.drawImage(videoElement, 0, 0);
+      const liveImageBase64 = canvas.toDataURL('image/jpeg');
+
+      // B. Send to backend for real AI comparison
+      setVerificationMessage("Verifying biometrics with AI...");
+      
+      const res = await fetch("/api/verifyFace", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ 
+          doctorId, 
+          referencePhotoUrl: referencePhoto,
+          liveImageBase64 
+        }),
       });
 
-      // B. Compute AI Descriptor for Reference Photo
-      const refResult = await faceapi.detectSingleFace(refImageEl)
-        .withFaceLandmarks()
-        .withFaceDescriptor();
+      const data = await res.json();
 
-      if (!refResult) {
-        throw new Error("Admin Error: No face found in the database reference photo.");
+      // Log metrics for debugging
+      if (data.metrics) {
+        console.log("[v0] Backend AI Metrics:", data.metrics);
+        console.log(`[v0] Match Confidence: ${data.metrics.matchConfidence}%`);
+        console.log(`[v0] Euclidean Distance: ${data.metrics.euclideanDistance}`);
       }
 
-      // C. Compute AI Descriptor for Live Webcam
-      const webcamResult = await faceapi.detectSingleFace(videoElement)
-        .withFaceLandmarks()
-        .withFaceDescriptor();
-        
-      if (!webcamResult) {
-        throw new Error("Verification Error: Lost face tracking. Please try again.");
+      if (!res.ok || !data.verified) {
+        throw new Error(data.error || "Face biometric verification failed.");
       }
 
-      // D. Compare the two Descriptors (Euclidean Distance)
-      const faceMatcher = new faceapi.FaceMatcher(refResult.descriptor);
-      const match = faceMatcher.findBestMatch(webcamResult.descriptor);
-
-      // Distance < 0.6 is the standard threshold for "Same Person"
-      if (match.distance <= 0.6) {
-        setVerificationMessage("IDENTITY CONFIRMED. Redirecting...");
-        setTimeout(() => setStep(3), 2000); // Move to Password Step
-      } else {
-        setIsLive(false); // Reset liveness
-        throw new Error("Liveness passed, but face does NOT match records.");
-      }
+      // Success
+      setVerificationMessage("IDENTITY CONFIRMED. Redirecting...");
+      setTimeout(() => setStep(3), 2000); // Move to Password Step
 
     } catch (err) {
       setError(err.message);
       setVerificationMessage("");
+      setIsLive(false); // Reset liveness
       // Stop the liveness loop if it was running
       if (livenessInterval) clearInterval(livenessInterval);
       setLivenessInterval(null);
