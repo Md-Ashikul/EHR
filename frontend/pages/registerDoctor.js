@@ -149,7 +149,7 @@ export default function RegisterDoctor() {
   };
 
   // ------------------------------------------------
-  // 4. BIOMETRIC VERIFICATION (Face Match with Backend AI)
+  // 4. BIOMETRIC VERIFICATION (Liveness Check + Face Match with Backend AI)
   // ------------------------------------------------
   const verifyBiometrics = async (videoElement) => {
     setLoading(true);
@@ -162,8 +162,8 @@ export default function RegisterDoctor() {
       ctx.drawImage(videoElement, 0, 0);
       const liveImageBase64 = canvas.toDataURL('image/jpeg');
 
-      // B. Send to backend for real AI comparison
-      setVerificationMessage("Verifying biometrics with AI...");
+      // B. Send to backend for real AI comparison (Liveness + Face Recognition)
+      setVerificationMessage("Verifying liveness and biometrics with AI...");
       
       const res = await fetch("/api/verifyFace", {
         method: "POST",
@@ -180,16 +180,19 @@ export default function RegisterDoctor() {
       // Log metrics for debugging
       if (data.metrics) {
         console.log("[v0] Backend AI Metrics:", data.metrics);
+        console.log(`[v0] Liveness Check Passed: ${data.metrics.livenessCheckPassed}`);
+        console.log(`[v0] Smile Score: ${data.metrics.smileScore}%`);
         console.log(`[v0] Match Confidence: ${data.metrics.matchConfidence}%`);
         console.log(`[v0] Euclidean Distance: ${data.metrics.euclideanDistance}`);
+        console.log(`[v0] Total Latency: ${data.metrics.totalLatency} ms`);
       }
 
       if (!res.ok || !data.verified) {
-        throw new Error(data.error || "Face biometric verification failed.");
+        throw new Error(data.error || "Face biometric or liveness verification failed.");
       }
 
-      // Success
-      setVerificationMessage("IDENTITY CONFIRMED. Redirecting...");
+      // Success - both liveness and face match passed
+      setVerificationMessage("✓ LIVENESS VERIFIED ✓ IDENTITY CONFIRMED. Redirecting...");
       setTimeout(() => setStep(3), 2000); // Move to Password Step
 
     } catch (err) {
