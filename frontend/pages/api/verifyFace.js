@@ -1,5 +1,5 @@
 import { readDoctorDB } from '../../lib/db-handler';
-import { loadModels, ensureModelsLoaded, bufferToImage, getFaceDescriptor, checkSmileDetection, compareFaces, faceapi } from '../../lib/face-api-server';
+import { loadModels, ensureModelsLoaded, bufferToImage, getFaceDescriptor, compareFaces, faceapi } from '../../lib/face-api-server';
 import path from 'path';
 import fs from 'fs';
 
@@ -61,38 +61,6 @@ export default async function handler(req, res) {
     const liveImageBuffer = Buffer.from(base64Data, 'base64');
     const liveImage = bufferToImage(liveImageBuffer);
 
-    // ============================================================
-    // 5.5. LIVENESS CHECK: Validate Smile Detection on Live Image
-    // ============================================================
-    console.log(`[AI] Checking smile detection (liveness check)...`);
-    const t_smileStart = performance.now();
-
-    const smileCheck = await checkSmileDetection(liveImage, 0.7);
-    
-    const t_smileEnd = performance.now();
-    const smileCheckTime = (t_smileEnd - t_smileStart).toFixed(2);
-
-    console.log(`[LIVENESS] Smile Score: ${(smileCheck.smileScore * 100).toFixed(2)}%`);
-    console.log(`[LIVENESS] Is Smiling: ${smileCheck.isSmiling}`);
-    console.log(`[LIVENESS] Smile Detection Time: ${smileCheckTime} ms`);
-
-    // If smile not detected, FAIL here (don't proceed to face matching)
-    if (!smileCheck.isSmiling) {
-      const failMetrics = {
-        smileScore: (smileCheck.smileScore * 100).toFixed(2),
-        smileCheckTime,
-        totalLatency: ((performance.now() - t_start) / 1000).toFixed(2)
-      };
-      
-      console.log(`[LIVENESS FAILED] Smile threshold not met. Score: ${failMetrics.smileScore}%`);
-      
-      return res.status(400).json({ 
-        verified: false, 
-        error: 'Liveness check failed: No smile detected. Please smile at the camera.',
-        metrics: failMetrics
-      });
-    }
-
     // 6. Compute Face Descriptors
     console.log(`[AI] Computing descriptor for reference photo...`);
     const t_refStart = performance.now();
@@ -137,10 +105,6 @@ export default async function handler(req, res) {
     const totalLatency = (t_end - t_start).toFixed(2);
 
     // Log comprehensive metrics
-    console.log(`[METRIC] === LIVENESS VERIFICATION ===`);
-    console.log(`[METRIC] Smile Score: ${(smileCheck.smileScore * 100).toFixed(2)}%`);
-    console.log(`[METRIC] Smile Detection Time: ${smileCheckTime} ms`);
-    console.log(`[METRIC] === FACE RECOGNITION ===`);
     console.log(`[METRIC] Reference Face Confidence: ${refFaceScore}%`);
     console.log(`[METRIC] Live Face Confidence: ${liveFaceScore}%`);
     console.log(`[METRIC] Reference Descriptor Compute Time: ${refComputeTime} ms`);
@@ -149,19 +113,15 @@ export default async function handler(req, res) {
     console.log(`[METRIC] Match Threshold: ${THRESHOLD}`);
     console.log(`[METRIC] Is Match: ${comparison.isMatch}`);
     console.log(`[METRIC] Match Confidence: ${comparison.confidence}%`);
-    console.log(`[METRIC] === PERFORMANCE ===`);
     console.log(`[METRIC] Total AI Latency: ${totalLatency} ms`);
     console.log("----------------------------------------------");
 
-    // 9. Return Result (only if both liveness AND face match pass)
+    // 9. Return Result
     if (comparison.isMatch) {
       res.status(200).json({ 
         verified: true, 
-        message: 'Liveness check and face biometric match successful!',
+        message: 'Face biometric match successful!',
         metrics: {
-          livenessCheckPassed: true,
-          smileScore: (smileCheck.smileScore * 100).toFixed(2),
-          smileCheckTime,
           euclideanDistance: comparison.distance.toFixed(4),
           matchConfidence: comparison.confidence,
           refFaceScore,
@@ -176,9 +136,6 @@ export default async function handler(req, res) {
         verified: false, 
         error: `Face does not match. Distance: ${comparison.distance.toFixed(4)} (threshold: ${THRESHOLD})`,
         metrics: {
-          livenessCheckPassed: true,
-          smileScore: (smileCheck.smileScore * 100).toFixed(2),
-          smileCheckTime,
           euclideanDistance: comparison.distance.toFixed(4),
           matchConfidence: comparison.confidence,
           refFaceScore,

@@ -56,7 +56,7 @@ export function bufferToImage(buffer) {
 }
 
 /**
- * Extract face descriptor from image (for face recognition)
+ * Extract face descriptor from image
  */
 export async function getFaceDescriptor(image) {
   const detection = await faceapi
@@ -65,25 +65,6 @@ export async function getFaceDescriptor(image) {
     .withFaceDescriptor();
 
   return detection;
-}
-
-/**
- * Check if face is smiling in image (liveness check)
- * Returns: { isSmiling, smileScore }
- */
-export async function checkSmileDetection(image, threshold = 0.7) {
-  const detection = await faceapi
-    .detectSingleFace(image)
-    .withFaceExpressions();
-
-  if (!detection) {
-    return { isSmiling: false, smileScore: 0, error: 'No face detected' };
-  }
-
-  const smileScore = detection.expressions.happy || 0;
-  const isSmiling = smileScore >= threshold;
-
-  return { isSmiling, smileScore, error: null };
 }
 
 /**
@@ -106,7 +87,6 @@ export default {
   ensureModelsLoaded,
   bufferToImage,
   getFaceDescriptor,
-  checkSmileDetection,
   compareFaces,
   faceapi, // Export faceapi instance for direct use
 };
