@@ -34,6 +34,7 @@ contract DoctorPatient {
     event DoctorRegistered(uint256 doctorId, string name, address wallet);
     event PatientRegistered(uint256 patientId, string name, address wallet);
     event DocumentUploaded(uint256 patientId, uint256 doctorId, string cid, string diseaseName, uint256 timestamp);
+    event DocumentUpdated(uint256 patientId, uint256 doctorId, uint256 docIndex, string cid, uint256 timestamp);
     event DocumentDeleted(uint256 patientId, uint256 doctorId, uint256 docIndex);
     event AccessGranted(uint256 patientId, uint256 doctorId);
     event AccessRevoked(uint256 patientId, uint256 doctorId);
@@ -129,6 +130,42 @@ contract DoctorPatient {
         patientDocuments[_patientId].pop();
 
         emit DocumentDeleted(_patientId, doc.doctorId, _docIndex);
+    }
+
+    // Update a document (Only by the doctor who created it).
+    // The string fields (_diseaseName, _description) carry AES-256-GCM ciphertext,
+    // and _cid / _imageCID point to the re-encrypted payload on IPFS.
+    function updateDocument(
+        uint256 _patientId,
+        uint256 _docIndex,
+        string memory _cid,
+        string memory _diseaseName,
+        string memory _description,
+        string memory _imageCID
+    ) public {
+        require(_docIndex < patientDocuments[_patientId].length, "Document index out of bounds");
+
+        Document storage doc = patientDocuments[_patientId][_docIndex];
+
+        // Find the doctor's wallet address from the doctor's ID
+        address doctorWallet = doctors[doc.doctorId].wallet;
+
+        // Only the doctor who created this document can update it
+        require(msg.sender == doctorWallet, "Only the creating doctor can update");
+
+        // The document must still be updated by an authorized doctor
+        require(
+            isDoctorAuthorized(_patientId, doc.doctorId),
+            "Doctor is not authorized"
+        );
+
+        doc.cid = _cid;
+        doc.diseaseName = _diseaseName;
+        doc.description = _description;
+        doc.imageCID = _imageCID;
+        doc.timestamp = block.timestamp;
+
+        emit DocumentUpdated(_patientId, doc.doctorId, _docIndex, _cid, block.timestamp);
     }
 
     // Get patient documents (for the patient)

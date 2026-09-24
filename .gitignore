@@ -15,3 +15,6 @@ out/
 # Local mockup or state databases
 db.json
 patients.json
+
+# Encrypted-document key vault (wrapped keys / envelopes only, but keep it local)
+keyvault.json
