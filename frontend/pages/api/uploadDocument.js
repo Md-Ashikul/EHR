@@ -13,7 +13,7 @@ const connectToIPFS = () => {
 export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
 
-  const { patientId, doctorId, diseaseName, description, imageFile } = req.body;
+  const { patientId, doctorId, docId, diseaseName, description, imageFile } = req.body;
 
   // --- THE FIX: Parse IDs to integers to prevent String mismatch ---
   const parsedPatientId = parseInt(patientId, 10);
@@ -65,7 +65,7 @@ export default async function handler(req, res) {
     // 5. Call Contract & Measure Blockchain Time
     const t_bc_start = performance.now();
     
-    const tx = await contractWithSigner.uploadDocument(parsedPatientId, parsedDoctorId, imageCID, diseaseName, description, imageCID);
+    const tx = await contractWithSigner.uploadDocument(parsedPatientId, parsedDoctorId, docId, imageCID, diseaseName, description, imageCID);
     const receipt = await tx.wait(); // Wait for confirmation
     
     const t_bc_end = performance.now();

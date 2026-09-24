@@ -18,6 +18,7 @@ contract DoctorPatient {
     struct Document {
         uint256 patientId;
         uint256 doctorId;
+        string docId; // Stable, client-minted identifier (survives updates and swap-and-pop)
         string cid; 
         string diseaseName;
         string description;
@@ -33,9 +34,9 @@ contract DoctorPatient {
 
     event DoctorRegistered(uint256 doctorId, string name, address wallet);
     event PatientRegistered(uint256 patientId, string name, address wallet);
-    event DocumentUploaded(uint256 patientId, uint256 doctorId, string cid, string diseaseName, uint256 timestamp);
-    event DocumentUpdated(uint256 patientId, uint256 doctorId, uint256 docIndex, string cid, uint256 timestamp);
-    event DocumentDeleted(uint256 patientId, uint256 doctorId, uint256 docIndex);
+    event DocumentUploaded(uint256 patientId, uint256 doctorId, string docId, string cid, uint256 timestamp);
+    event DocumentUpdated(uint256 patientId, uint256 doctorId, string docId, string cid, uint256 timestamp);
+    event DocumentDeleted(uint256 patientId, uint256 doctorId, string docId);
     event AccessGranted(uint256 patientId, uint256 doctorId);
     event AccessRevoked(uint256 patientId, uint256 doctorId);
 
@@ -81,6 +82,7 @@ contract DoctorPatient {
     function uploadDocument(
         uint256 _patientId,
         uint256 _doctorId,
+        string memory _docId,
         string memory _cid,
         string memory _diseaseName,
         string memory _description,
@@ -96,6 +98,7 @@ contract DoctorPatient {
             Document(
                 _patientId,
                 _doctorId,
+                _docId,
                 _cid,
                 _diseaseName,
                 _description,
@@ -107,29 +110,33 @@ contract DoctorPatient {
         emit DocumentUploaded(
             _patientId,
             _doctorId,
+            _docId,
             _cid,
-            _diseaseName,
             block.timestamp
         );
     }
 
     // Delete a document (Only by the doctor who created it)
-    function deleteDocument(uint256 _patientId, uint256 _docIndex) public {
-        require(_docIndex < patientDocuments[_patientId].length, "Document index out of bounds");
-        
+    function deleteDocument(uint256 _patientId, string memory _docId) public {
+        uint256 _docIndex = findDocumentIndexById(_patientId, _docId);
+        require(_docIndex != type(uint256).max, "Document not found");
+
         Document storage doc = patientDocuments[_patientId][_docIndex];
-        
+
         // Find the doctor's wallet address from the doctor's ID
         address doctorWallet = doctors[doc.doctorId].wallet;
-        
+
         // Only the doctor who created this document can delete it
         require(msg.sender == doctorWallet, "Only the creating doctor can delete");
+
+        // Capture before swap-and-pop overwrites the storage slot
+        uint256 deletedDoctorId = doc.doctorId;
 
         // Swap and pop
         patientDocuments[_patientId][_docIndex] = patientDocuments[_patientId][patientDocuments[_patientId].length - 1];
         patientDocuments[_patientId].pop();
 
-        emit DocumentDeleted(_patientId, doc.doctorId, _docIndex);
+        emit DocumentDeleted(_patientId, deletedDoctorId, _docId);
     }
 
     // Update a document (Only by the doctor who created it).
@@ -137,13 +144,14 @@ contract DoctorPatient {
     // and _cid / _imageCID point to the re-encrypted payload on IPFS.
     function updateDocument(
         uint256 _patientId,
-        uint256 _docIndex,
+        string memory _docId,
         string memory _cid,
         string memory _diseaseName,
         string memory _description,
         string memory _imageCID
     ) public {
-        require(_docIndex < patientDocuments[_patientId].length, "Document index out of bounds");
+        uint256 _docIndex = findDocumentIndexById(_patientId, _docId);
+        require(_docIndex != type(uint256).max, "Document not found");
 
         Document storage doc = patientDocuments[_patientId][_docIndex];
 
@@ -165,7 +173,7 @@ contract DoctorPatient {
         doc.imageCID = _imageCID;
         doc.timestamp = block.timestamp;
 
-        emit DocumentUpdated(_patientId, doc.doctorId, _docIndex, _cid, block.timestamp);
+        emit DocumentUpdated(_patientId, doc.doctorId, _docId, _cid, block.timestamp);
     }
 
     // Get patient documents (for the patient)
@@ -264,6 +272,17 @@ contract DoctorPatient {
     function findDoctorIndex(uint256 _patientId, uint256 _doctorId) private view returns (uint256) {
         for (uint256 i = 0; i < patients[_patientId].doctorAccess.length; i++) {
             if (patients[_patientId].doctorAccess[i] == _doctorId) {
+                return i;
+            }
+        }
+        return type(uint256).max; // Return max value if not found
+    }
+
+    // Helper to find a document's array index by its stable docId
+    function findDocumentIndexById(uint256 _patientId, string memory _docId) private view returns (uint256) {
+        Document[] storage docs = patientDocuments[_patientId];
+        for (uint256 i = 0; i < docs.length; i++) {
+            if (keccak256(bytes(docs[i].docId)) == keccak256(bytes(_docId))) {
                 return i;
             }
         }
