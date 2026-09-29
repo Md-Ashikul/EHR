@@ -43,6 +43,14 @@ export default function UploadDocument() {
 
     setMessage("Uploading...");
     
+    // Mint a stable, client-side document id. It is immutable across updates and
+    // survives the contract's swap-and-pop delete, so it (not the array index)
+    // is the durable link between an on-chain document and its key-vault envelope.
+    const docId =
+      typeof crypto !== "undefined" && crypto.randomUUID
+        ? crypto.randomUUID()
+        : `${Date.now()}-${Math.random().toString(16).slice(2)}`;
+
     const reader = new FileReader();
     reader.onloadend = async () => {
       const base64Image = reader.result.split(",")[1];
@@ -50,7 +58,7 @@ export default function UploadDocument() {
         const res = await fetch("/api/uploadDocument", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ patientId, doctorId, diseaseName, description, imageFile: base64Image }),
+            body: JSON.stringify({ patientId, doctorId, docId, diseaseName, description, imageFile: base64Image }),
         });
         const data = await res.json();
         if(res.ok) setMessage("Success! CID: " + data.imageCID);

@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/router";
 import { ipfsProtocol, ipfsHost, ipfsGatewayPort } from "../lib/constants"; // CHANGED
+import { getSignedContract, computeTxMetrics } from "../lib/ethClient";
 
 export default function GetDocuments() {
   const router = useRouter();
@@ -27,24 +28,25 @@ export default function GetDocuments() {
 
   useEffect(fetchDocs, [patientId, doctorId, isDoctor]);
 
-  const handleDelete = async (docIndex) => {
+  const handleDelete = async (docId) => {
     if (!doctorPrivateKey) {
       alert("Please enter your private key to delete.");
       return;
     }
     setError("Deleting...");
     try {
-      const res = await fetch("/api/deleteDocument", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ patientId, docIndex, doctorPrivateKey })
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error);
+      // Signed locally in the browser; the private key never leaves the client.
+      const { provider, contract } = getSignedContract(doctorPrivateKey);
+      const tx = await contract.deleteDocument(parseInt(patientId, 10), docId);
+      const receipt = await tx.wait();
+
+      const metrics = await computeTxMetrics(provider, receipt);
+      console.log(`[METRIC - Delete] Gas: ${metrics.gasUsed}, Cost: $${metrics.costUsd}`);
+
       setError("Document deleted successfully.");
       fetchDocs(); // Refresh list
     } catch (err) {
-      setError(err.message);
+      setError(err.reason || err.message);
     }
   };
 
@@ -83,7 +85,7 @@ export default function GetDocuments() {
             </div>
             {isDoctor && (
               <button
-                onClick={() => handleDelete(i)}
+                onClick={() => handleDelete(doc.docId)}
                 className="bg-red-500 text-white px-3 py-1 rounded h-fit"
               >
                 Delete
