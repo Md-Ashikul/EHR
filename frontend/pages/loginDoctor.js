@@ -1,14 +1,24 @@
 import { useState } from "react";
 import { useRouter } from "next/router";
+import { useKeySession } from "../lib/crypto/keySession";
 
 export default function LoginDoctor() {
   const [doctorId, setDoctorId] = useState("");
   const [password, setPassword] = useState("");
+  const [passphrase, setPassphrase] = useState("");
   const [error, setError] = useState("");
+  const [status, setStatus] = useState("");
   const router = useRouter();
+  const { unlock } = useKeySession();
 
   const handleLogin = async () => {
+    setError("");
+    if (!passphrase) {
+      setError("Enter your encryption passphrase.");
+      return;
+    }
     try {
+      setStatus("Checking credentials...");
       const res = await fetch("/api/loginDoctor", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -19,6 +29,10 @@ export default function LoginDoctor() {
       if (data.error) {
         setError(data.error);
       } else {
+        setStatus("Unlocking your encryption keys...");
+        await unlock({ role: "doctor", id: data.doctorId, passphrase });
+        setPassphrase("");
+
         // --- THE FIX: Save to browser memory so it's never lost ---
         localStorage.setItem("doctorId", data.doctorId);
         localStorage.setItem("doctorName", data.doctorName);
@@ -30,7 +44,9 @@ export default function LoginDoctor() {
         });
       }
     } catch (err) {
-      setError("Login failed. Please try again.");
+      setError(err.message || "Login failed. Please try again.");
+    } finally {
+      setStatus("");
     }
   };
 
@@ -54,14 +70,28 @@ export default function LoginDoctor() {
             onChange={(e) => setPassword(e.target.value)}
             className="w-full p-3 border border-gray-300 rounded-lg"
           />
+          <label htmlFor="doctor-passphrase" className="sr-only">Encryption passphrase</label>
+          <input
+            id="doctor-passphrase"
+            type="password"
+            autoComplete="off"
+            placeholder="Encryption passphrase (separate from password)"
+            value={passphrase}
+            onChange={(e) => setPassphrase(e.target.value)}
+            className="w-full p-3 border border-gray-300 rounded-lg"
+          />
+          <p className="text-xs text-gray-500 leading-relaxed">
+            Your first login sets this passphrase. It never leaves your browser and cannot be recovered.
+          </p>
 
           {error && <p className="text-red-500 text-sm">{error}</p>}
 
           <button
             onClick={handleLogin}
-            className="w-full py-3 mt-2 text-white bg-teal-600 rounded-lg hover:bg-teal-700 transition"
+            disabled={Boolean(status)}
+            className="w-full py-3 mt-2 text-white bg-teal-600 rounded-lg hover:bg-teal-700 transition disabled:opacity-60"
           >
-            Login
+            {status || "Login"}
           </button>
           
           <div className="text-center mt-4">
