@@ -4,7 +4,7 @@ import { contractAddress, contractABI, providerUrl } from '../../lib/constants';
 export default async function handler(req, res) {
   const { patientId, doctorId } = req.query;
 
-  // THE FIX: Parse to Integers
+  // Parse to Integers
   const pId = parseInt(patientId, 10);
   const dId = parseInt(doctorId, 10);
 
@@ -28,10 +28,11 @@ export default async function handler(req, res) {
     console.log(`[METRIC] Data Fetch Latency: ${readLatency} ms`);
     console.log("------------------------------------");
 
-    // Convert BigInts
+    // Convert BigInts & map fields
     const serializableDocuments = documents.map(doc => ({
       patientId: Number(doc.patientId),
       doctorId: Number(doc.doctorId),
+      docId: doc.docId, // <-- FIXED: Added missing docId
       cid: doc.cid,
       diseaseName: doc.diseaseName,
       description: doc.description,
