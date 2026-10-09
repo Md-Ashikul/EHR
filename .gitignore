@@ -19,9 +19,6 @@ patients.json
 # Encrypted-document key vault (wrapped keys / envelopes only, but keep it local)
 keyvault.json
 
-# Downloaded LFW images
-/lfw_images/
-
 # Biometric evaluation cache
 /biometric_evaluation/cache/
 
