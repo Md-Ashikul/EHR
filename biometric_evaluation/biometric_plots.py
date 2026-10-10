@@ -6,6 +6,8 @@ import numpy as np
 import matplotlib.pyplot as plt
 from sklearn.metrics import roc_curve, roc_auc_score
 
+REQUIRED_RESULTS = ('biometric_pairs.csv', 'biometric_thresholds.csv', 'biometric_summary.csv')
+
 ROOT = Path(__file__).resolve().parent
 RESULTS = ROOT / "results"
 PLOTS = ROOT / "plots"
@@ -19,8 +21,14 @@ def f(row, key):
     try: return float(row[key])
     except (ValueError, TypeError, KeyError): return math.nan
 
+generated_plots = []
+
 def save(fig, name):
-    fig.tight_layout(); fig.savefig(PLOTS / f"{name}.png", dpi=300, bbox_inches='tight'); fig.savefig(PLOTS / f"{name}.pdf", bbox_inches='tight'); plt.close(fig)
+    fig.tight_layout(); fig.savefig(PLOTS / f"{name}.png", dpi=300, bbox_inches='tight'); fig.savefig(PLOTS / f"{name}.pdf", bbox_inches='tight'); plt.close(fig); generated_plots.append(name)
+
+missing_results = [name for name in REQUIRED_RESULTS if not (RESULTS / name).is_file()]
+if missing_results:
+    raise FileNotFoundError(f"Required evaluator output(s) missing: {', '.join(missing_results)}. Run the Node.js evaluator successfully first.")
 
 pairs = read_csv('biometric_pairs.csv')
 valid = [r for r in pairs if r.get('evaluation_status') == 'evaluated' and math.isfinite(f(r,'distance'))]
@@ -71,4 +79,4 @@ if thresholds:
         fig,ax=plt.subplots(figsize=(8,5)); pos=np.arange(len(labels)); width=.18
         for i,k in enumerate(vals): ax.bar(pos+(i-1.5)*width,vals[k],width,label=k.upper())
         ax.set_xticks(pos,labels); ax.set_ylim(0,1); ax.set_ylabel('Rate'); ax.set_title('Threshold comparison'); ax.legend(); save(fig,'threshold_comparison')
-print(f'Generated plots from {len(valid)} evaluated pairs in {PLOTS}')
+print(f'Generated {len(generated_plots)} plot(s) ({", ".join(generated_plots)}) from {len(valid)} evaluated pairs in {PLOTS}')
