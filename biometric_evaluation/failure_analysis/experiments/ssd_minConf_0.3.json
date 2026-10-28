@@ -1,0 +1,4237 @@
+{
+  "threshold": 0.3,
+  "summary": {
+    "detected": 250,
+    "errors": 0,
+    "total": 619,
+    "rate": 0.40387722132471726
+  },
+  "detections": [
+    {
+      "path": "lfw_images/Antony_Leung/Antony_Leung_0001.jpg",
+      "detected": true,
+      "score": 0.4497316777706146,
+      "box": {
+        "x": 74.87784326076508,
+        "y": 62.59646266698837,
+        "w": 109.13172364234924,
+        "h": 120.27613073587418
+      }
+    },
+    {
+      "path": "lfw_images/Benjamin_Netanyahu/Benjamin_Netanyahu_0005.jpg",
+      "detected": true,
+      "score": 0.3501497507095337,
+      "box": {
+        "x": 85.94182878732681,
+        "y": 32.21331536769867,
+        "w": 142.89449900388718,
+        "h": 167.17518866062164
+      }
+    },
+    {
+      "path": "lfw_images/Bernard_Law/Bernard_Law_0003.jpg",
+      "detected": false
+    },
+    {
+      "path": "lfw_images/Brad_Johnson/Brad_Johnson_0004.jpg",
+      "detected": true,
+      "score": 0.40897056460380554,
+      "box": {
+        "x": 57.8116774559021,
+        "y": 73.4151154756546,
+        "w": 112.62783408164978,
+        "h": 119.36858296394348
+      }
+    },
+    {
+      "path": "lfw_images/Charles_Grassley/Charles_Grassley_0002.jpg",
+      "detected": true,
+      "score": 0.40149909257888794,
+      "box": {
+        "x": 206.71850442886353,
+        "y": 14.913171529769897,
+        "w": 42.140454053878784,
+        "h": 177.41268873214722
+      }
+    },
+    {
+      "path": "lfw_images/Doris_Roberts/Doris_Roberts_0003.jpg",
+      "detected": true,
+      "score": 0.3342670202255249,
+      "box": {
+        "x": 59.664011001586914,
+        "y": 45.84044963121414,
+        "w": 142.27640628814697,
+        "h": 147.36398309469223
+      }
+    },
+    {
+      "path": "lfw_images/Edmund_Stoiber/Edmund_Stoiber_0007.jpg",
+      "detected": false
+    },
+    {
+      "path": "lfw_images/Federico_Trillo/Federico_Trillo_0001.jpg",
+      "detected": true,
+      "score": 0.3242175579071045,
+      "box": {
+        "x": 82.45416730642319,
+        "y": 69.22028958797455,
+        "w": 120.05502730607986,
+        "h": 110.11137068271637
+      }
+    },
+    {
+      "path": "lfw_images/Fred_Thompson/Fred_Thompson_0001.jpg",
+      "detected": false
+    },
+    {
+      "path": "lfw_images/Gray_Davis/Gray_Davis_0022.jpg",
+      "detected": false
+    },
+    {
+      "path": "lfw_images/Jeffrey_Archer/Jeffrey_Archer_0002.jpg",
+      "detected": true,
+      "score": 0.3510264456272125,
+      "box": {
+        "x": 53.33460122346878,
+        "y": 59.17087197303772,
+        "w": 113.56722563505173,
+        "h": 119.82454359531403
+      }
+    },
+    {
+      "path": "lfw_images/Jimmy_Carter/Jimmy_Carter_0004.jpg",
+      "detected": true,
+      "score": 0.3286353349685669,
+      "box": {
+        "x": 78.61239463090897,
+        "y": 24.704977869987488,
+        "w": 115.96973985433578,
+        "h": 175.29110610485077
+      }
+    },
+    {
+      "path": "lfw_images/Jimmy_Carter/Jimmy_Carter_0008.jpg",
+      "detected": false
+    },
+    {
+      "path": "lfw_images/John_McCain/John_McCain_0003.jpg",
+      "detected": false
+    },
+    {
+      "path": "lfw_images/John_McCain/John_McCain_0007.jpg",
+      "detected": false
+    },
+    {
+      "path": "lfw_images/Jorge_Castaneda/Jorge_Castaneda_0001.jpg",
+      "detected": true,
+      "score": 0.4452783167362213,
+      "box": {
+        "x": 58.87161195278168,
+        "y": 43.59985142946243,
+        "w": 121.30522727966309,
+        "h": 146.38667553663254
+      }
+    },
+    {
+      "path": "lfw_images/Joseph_Blatter/Joseph_Blatter_0001.jpg",
+      "detected": false
+    },
+    {
+      "path": "lfw_images/Juan_Pablo_Montoya/Juan_Pablo_Montoya_0001.jpg",
+      "detected": false
+    },
+    {
+      "path": "lfw_images/Kevin_Stallings/Kevin_Stallings_0002.jpg",
+      "detected": false
+    },
+    {
+      "path": "lfw_images/Lindsey_Graham/Lindsey_Graham_0001.jpg",
+      "detected": true,
+      "score": 0.4960089921951294,
+      "box": {
+        "x": 56.99824541807175,
+        "y": 64.38755989074707,
+        "w": 109.40832644701004,
+        "h": 129.26137447357178
+      }
+    },
+    {
+      "path": "lfw_images/Mario_Dumont/Mario_Dumont_0001.jpg",
+      "detected": false
+    },
+    {
+      "path": "lfw_images/Matthew_Broderick/Matthew_Broderick_0001.jpg",
+      "detected": false
+    },
+    {
+      "path": "lfw_images/Patty_Schnyder/Patty_Schnyder_0002.jpg",
+      "detected": true,
+      "score": 0.37485742568969727,
+      "box": {
+        "x": 71.73498719930649,
+        "y": 55.62099441885948,
+        "w": 115.2794137597084,
+        "h": 123.55809286236763
+      }
+    },
+    {
+      "path": "lfw_images/Phil_Gramm/Phil_Gramm_0002.jpg",
+      "detected": false
+    },
+    {
+      "path": "lfw_images/Ricardo_Lagos/Ricardo_Lagos_0023.jpg",
+      "detected": false
+    },
+    {
+      "path": "lfw_images/Romano_Prodi/Romano_Prodi_0003.jpg",
+      "detected": true,
+      "score": 0.3537653684616089,
+      "box": {
+        "x": 52.66054719686508,
+        "y": 24.73434805870056,
+        "w": 125.99138170480728,
+        "h": 152.65972912311554
+      }
+    },
+    {
+      "path": "lfw_images/Sachiko_Yamada/Sachiko_Yamada_0004.jpg",
+      "detected": true,
+      "score": 0.31603527069091797,
+      "box": {
+        "x": 71.07612490653992,
+        "y": 77.26629078388214,
+        "w": 108.4396243095398,
+        "h": 112.3395562171936
+      }
+    },
+    {
+      "path": "lfw_images/Sam_Bith/Sam_Bith_0003.jpg",
+      "detected": false
+    },
+    {
+      "path": "lfw_images/Tom_Ridge/Tom_Ridge_0009.jpg",
+      "detected": true,
+      "score": 0.48704490065574646,
+      "box": {
+        "x": 74.95695352554321,
+        "y": 71.83526456356049,
+        "w": 97.75520861148834,
+        "h": 109.762042760849
+      }
+    },
+    {
+      "path": "lfw_images/Tommy_Thompson/Tommy_Thompson_0001.jpg",
+      "detected": false
+    },
+    {
+      "path": "lfw_images/Trent_Lott/Trent_Lott_0002.jpg",
+      "detected": false
+    },
+    {
+      "path": "lfw_images/Trent_Lott/Trent_Lott_0003.jpg",
+      "detected": false
+    },
+    {
+      "path": "lfw_images/Trent_Lott/Trent_Lott_0008.jpg",
+      "detected": false
+    },
+    {
+      "path": "lfw_images/Yukiko_Okudo/Yukiko_Okudo_0001.jpg",
+      "detected": true,
+      "score": 0.3472972512245178,
+      "box": {
+        "x": 66.8850988149643,
+        "y": 67.81119108200073,
+        "w": 101.16936266422272,
+        "h": 119.53654885292053
+      }
+    },
+    {
+      "path": "lfw_images/Portia_de_Rossi/Portia_de_Rossi_0001.jpg",
+      "detected": false
+    },
+    {
+      "path": "lfw_images/Jong_Thae_Hwa/Jong_Thae_Hwa_0002.jpg",
+      "detected": false
+    },
+    {
+      "path": "lfw_images/Heather_Chinnock/Heather_Chinnock_0001.jpg",
+      "detected": true,
+      "score": 0.41650062799453735,
+      "box": {
+        "x": 54.782893508672714,
+        "y": 64.0125572681427,
+        "w": 116.53793230652809,
+        "h": 123.14662337303162
+      }
+    },
+    {
+      "path": "lfw_images/Andy_Wisecarver/Andy_Wisecarver_0001.jpg",
+      "detected": false
+    },
+    {
+      "path": "lfw_images/Bob_Alper/Bob_Alper_0001.jpg",
+      "detected": true,
+      "score": 0.43797898292541504,
+      "box": {
+        "x": 70.10965049266815,
+        "y": 60.08661910891533,
+        "w": 111.24369502067566,
+        "h": 119.49749663472176
+      }
+    },
+    {
+      "path": "lfw_images/Bryan_Adams/Bryan_Adams_0001.jpg",
+      "detected": false
+    },
+    {
+      "path": "lfw_images/John_Engler/John_Engler_0001.jpg",
+      "detected": false
+    },
+    {
+      "path": "lfw_images/Darren_Campel/Darren_Campel_0001.jpg",
+      "detected": false
+    },
+    {
+      "path": "lfw_images/David_Collenette/David_Collenette_0001.jpg",
+      "detected": true,
+      "score": 0.3407517373561859,
+      "box": {
+        "x": 96.42238914966583,
+        "y": 32.06080198287964,
+        "w": 99.32926297187805,
+        "h": 158.11830759048462
+      }
+    },
+    {
+      "path": "lfw_images/Jim_Hardin/Jim_Hardin_0001.jpg",
+      "detected": false
+    },
+    {
+      "path": "lfw_images/Francisco_Garcia/Francisco_Garcia_0001.jpg",
+      "detected": false
+    },
+    {
+      "path": "lfw_images/Garry_Witherall/Garry_Witherall_0001.jpg",
+      "detected": false
+    },
+    {
+      "path": "lfw_images/Glenn_Plummer/Glenn_Plummer_0001.jpg",
+      "detected": true,
+      "score": 0.4407576322555542,
+      "box": {
+        "x": 95.75051814317703,
+        "y": 63.588060438632965,
+        "w": 93.75353902578354,
+        "h": 134.8218247294426
+      }
+    },
+    {
+      "path": "lfw_images/Karen_Lynn_Gorney/Karen_Lynn_Gorney_0001.jpg",
+      "detected": true,
+      "score": 0.3132832944393158,
+      "box": {
+        "x": 29.01797741651535,
+        "y": 43.00909489393234,
+        "w": 132.5676515698433,
+        "h": 157.01086074113846
+      }
+    },
+    {
+      "path": "lfw_images/Mary_Jo_Myers/Mary_Jo_Myers_0001.jpg",
+      "detected": false
+    },
+    {
+      "path": "lfw_images/Kim_Dong-hwa/Kim_Dong-hwa_0001.jpg",
+      "detected": true,
+      "score": 0.35347843170166016,
+      "box": {
+        "x": 59.44681167602539,
+        "y": 63.764095306396484,
+        "w": 97.61041402816772,
+        "h": 115.14943838119507
+      }
+    },
+    {
+      "path": "lfw_images/Yasushi_Akashi/Yasushi_Akashi_0001.jpg",
+      "detected": false
+    },
+    {
+      "path": "lfw_images/Jeffrey_Ashby/Jeffrey_Ashby_0001.jpg",
+      "detected": false
+    },
+    {
+      "path": "lfw_images/Jerry_Tarkanian/Jerry_Tarkanian_0001.jpg",
+      "detected": true,
+      "score": 0.3299383223056793,
+      "box": {
+        "x": 80.61195909976959,
+        "y": 80.91612160205841,
+        "w": 103.07607054710388,
+        "h": 100.8654534816742
+      }
+    },
+    {
+      "path": "lfw_images/John_Richardson/John_Richardson_0001.jpg",
+      "detected": false
+    },
+    {
+      "path": "lfw_images/Rachel_Kempson/Rachel_Kempson_0001.jpg",
+      "detected": true,
+      "score": 0.4712749123573303,
+      "box": {
+        "x": 80.2747905254364,
+        "y": 49.598515033721924,
+        "w": 102.92038321495056,
+        "h": 148.5133171081543
+      }
+    },
+    {
+      "path": "lfw_images/Adrien_Brody/Adrien_Brody_0012.jpg",
+      "detected": true,
+      "score": 0.4814096689224243,
+      "box": {
+        "x": 92.14707463979721,
+        "y": 62.769874930381775,
+        "w": 95.44379264116287,
+        "h": 115.55582284927368
+      }
+    },
+    {
+      "path": "lfw_images/Adrien_Brody/Adrien_Brody_0008.jpg",
+      "detected": true,
+      "score": 0.36590856313705444,
+      "box": {
+        "x": 48.863109201192856,
+        "y": 65.3640627861023,
+        "w": 115.69819226861,
+        "h": 127.41532921791077
+      }
+    },
+    {
+      "path": "lfw_images/Ana_Palacio/Ana_Palacio_0007.jpg",
+      "detected": false
+    },
+    {
+      "path": "lfw_images/Ana_Palacio/Ana_Palacio_0006.jpg",
+      "detected": true,
+      "score": 0.4807109832763672,
+      "box": {
+        "x": 82.52935111522675,
+        "y": 64.69698250293732,
+        "w": 108.63959789276123,
+        "h": 116.20208621025085
+      }
+    },
+    {
+      "path": "lfw_images/Charles_Bronson/Charles_Bronson_0001.jpg",
+      "detected": true,
+      "score": 0.41663825511932373,
+      "box": {
+        "x": 78.87731492519379,
+        "y": 62.9764199256897,
+        "w": 102.66491770744324,
+        "h": 113.2262647151947
+      }
+    },
+    {
+      "path": "lfw_images/David_Anderson/David_Anderson_0002.jpg",
+      "detected": false
+    },
+    {
+      "path": "lfw_images/David_Beckham/David_Beckham_0020.jpg",
+      "detected": false
+    },
+    {
+      "path": "lfw_images/Dick_Clark/Dick_Clark_0001.jpg",
+      "detected": true,
+      "score": 0.4347231984138489,
+      "box": {
+        "x": 75.8056640625,
+        "y": 63.90971690416336,
+        "w": 108.51851105690002,
+        "h": 121.81132286787033
+      }
+    },
+    {
+      "path": "lfw_images/Dick_Clark/Dick_Clark_0003.jpg",
+      "detected": true,
+      "score": 0.45714086294174194,
+      "box": {
+        "x": 79.69941198825836,
+        "y": 61.418041586875916,
+        "w": 100.36167502403259,
+        "h": 127.39560008049011
+      }
+    },
+    {
+      "path": "lfw_images/Donald_Fehr/Donald_Fehr_0004.jpg",
+      "detected": false
+    },
+    {
+      "path": "lfw_images/Ed_Rosenthal/Ed_Rosenthal_0001.jpg",
+      "detected": true,
+      "score": 0.4725571274757385,
+      "box": {
+        "x": 56.743670254945755,
+        "y": 59.1096431016922,
+        "w": 100.76534375548363,
+        "h": 128.72514128684998
+      }
+    },
+    {
+      "path": "lfw_images/Evander_Holyfield/Evander_Holyfield_0002.jpg",
+      "detected": false
+    },
+    {
+      "path": "lfw_images/Fujio_Cho/Fujio_Cho_0002.jpg",
+      "detected": false
+    },
+    {
+      "path": "lfw_images/George_Brumley/George_Brumley_0001.jpg",
+      "detected": false
+    },
+    {
+      "path": "lfw_images/Harry_Kalas/Harry_Kalas_0002.jpg",
+      "detected": false
+    },
+    {
+      "path": "lfw_images/James_McGreevey/James_McGreevey_0004.jpg",
+      "detected": false
+    },
+    {
+      "path": "lfw_images/Jim_Hahn/Jim_Hahn_0001.jpg",
+      "detected": false
+    },
+    {
+      "path": "lfw_images/Jorge_Batlle/Jorge_Batlle_0001.jpg",
+      "detected": true,
+      "score": 0.4371667206287384,
+      "box": {
+        "x": 71.3447779417038,
+        "y": 40.42576253414154,
+        "w": 140.4641568660736,
+        "h": 170.63778638839722
+      }
+    },
+    {
+      "path": "lfw_images/Lindsay_Davenport/Lindsay_Davenport_0010.jpg",
+      "detected": true,
+      "score": 0.43734702467918396,
+      "box": {
+        "x": 73.65258038043976,
+        "y": 57.36491084098816,
+        "w": 100.34504532814026,
+        "h": 137.71656155586243
+      }
+    },
+    {
+      "path": "lfw_images/Manfred_Stolpe/Manfred_Stolpe_0001.jpg",
+      "detected": false
+    },
+    {
+      "path": "lfw_images/Nelson_Mandela/Nelson_Mandela_0001.jpg",
+      "detected": false
+    },
+    {
+      "path": "lfw_images/Nelson_Mandela/Nelson_Mandela_0003.jpg",
+      "detected": false
+    },
+    {
+      "path": "lfw_images/Placido_Domingo/Placido_Domingo_0001.jpg",
+      "detected": false
+    },
+    {
+      "path": "lfw_images/Saddam_Hussein/Saddam_Hussein_0010.jpg",
+      "detected": true,
+      "score": 0.3795328438282013,
+      "box": {
+        "x": 76.88763737678528,
+        "y": 69.90107148885727,
+        "w": 94.84505653381348,
+        "h": 119.85570937395096
+      }
+    },
+    {
+      "path": "lfw_images/Silvio_Berlusconi/Silvio_Berlusconi_0026.jpg",
+      "detected": true,
+      "score": 0.48984044790267944,
+      "box": {
+        "x": 68.70310008525848,
+        "y": 73.00595939159393,
+        "w": 102.95124351978302,
+        "h": 120.27812004089355
+      }
+    },
+    {
+      "path": "lfw_images/Steven_Spielberg/Steven_Spielberg_0003.jpg",
+      "detected": false
+    },
+    {
+      "path": "lfw_images/Tippi_Hedren/Tippi_Hedren_0002.jpg",
+      "detected": false
+    },
+    {
+      "path": "lfw_images/William_Donaldson/William_Donaldson_0001.jpg",
+      "detected": true,
+      "score": 0.4096454083919525,
+      "box": {
+        "x": 69.64624673128128,
+        "y": 55.588893592357635,
+        "w": 102.16813534498215,
+        "h": 125.7530227303505
+      }
+    },
+    {
+      "path": "lfw_images/Ben_Kingsley/Ben_Kingsley_0001.jpg",
+      "detected": true,
+      "score": 0.4819844365119934,
+      "box": {
+        "x": 55.60765042901039,
+        "y": 48.825427889823914,
+        "w": 109.58778485655785,
+        "h": 145.18727362155914
+      }
+    },
+    {
+      "path": "lfw_images/Wayne_Allard/Wayne_Allard_0001.jpg",
+      "detected": false
+    },
+    {
+      "path": "lfw_images/Bruce_Gebhardt/Bruce_Gebhardt_0001.jpg",
+      "detected": false
+    },
+    {
+      "path": "lfw_images/Vincent_Sombrotto/Vincent_Sombrotto_0001.jpg",
+      "detected": true,
+      "score": 0.46485504508018494,
+      "box": {
+        "x": 90.70346504449844,
+        "y": 84.01651680469513,
+        "w": 80.77385276556015,
+        "h": 98.65313768386841
+      }
+    },
+    {
+      "path": "lfw_images/Teri_Files/Teri_Files_0001.jpg",
+      "detected": false
+    },
+    {
+      "path": "lfw_images/Camille_Colvin/Camille_Colvin_0001.jpg",
+      "detected": false
+    },
+    {
+      "path": "lfw_images/Carolina_Barco/Carolina_Barco_0001.jpg",
+      "detected": false
+    },
+    {
+      "path": "lfw_images/Richard_Tubb/Richard_Tubb_0001.jpg",
+      "detected": false
+    },
+    {
+      "path": "lfw_images/Connie_Freydell/Connie_Freydell_0001.jpg",
+      "detected": false
+    },
+    {
+      "path": "lfw_images/Des_Brown/Des_Brown_0001.jpg",
+      "detected": false
+    },
+    {
+      "path": "lfw_images/Doc_Rivers/Doc_Rivers_0001.jpg",
+      "detected": true,
+      "score": 0.43736928701400757,
+      "box": {
+        "x": 61.326831579208374,
+        "y": 57.18468874692917,
+        "w": 116.67327582836151,
+        "h": 162.13736683130264
+      }
+    },
+    {
+      "path": "lfw_images/Fatmir_Limaj/Fatmir_Limaj_0001.jpg",
+      "detected": true,
+      "score": 0.318601131439209,
+      "box": {
+        "x": 70.29557228088379,
+        "y": 67.56900250911713,
+        "w": 99.89169239997864,
+        "h": 118.8773512840271
+      }
+    },
+    {
+      "path": "lfw_images/Mark_Sisk/Mark_Sisk_0001.jpg",
+      "detected": false
+    },
+    {
+      "path": "lfw_images/Saddam_Hussein/Saddam_Hussein_0018.jpg",
+      "detected": true,
+      "score": 0.3567850887775421,
+      "box": {
+        "x": 65.25915861129761,
+        "y": 78.1145840883255,
+        "w": 104.7080010175705,
+        "h": 109.25164818763733
+      }
+    },
+    {
+      "path": "lfw_images/John_Burkett/John_Burkett_0001.jpg",
+      "detected": false
+    },
+    {
+      "path": "lfw_images/John_McKay/John_McKay_0001.jpg",
+      "detected": false
+    },
+    {
+      "path": "lfw_images/Leandrinho_Barbosa/Leandrinho_Barbosa_0001.jpg",
+      "detected": true,
+      "score": 0.3766663670539856,
+      "box": {
+        "x": 44.41389441490173,
+        "y": 20.08149027824402,
+        "w": 181.09643459320068,
+        "h": 220.97554802894592
+      }
+    },
+    {
+      "path": "lfw_images/Leonard_Schrank/Leonard_Schrank_0001.jpg",
+      "detected": true,
+      "score": 0.31999191641807556,
+      "box": {
+        "x": 85.41087061166763,
+        "y": 56.25474452972412,
+        "w": 101.74872726202011,
+        "h": 133.79907608032227
+      }
+    },
+    {
+      "path": "lfw_images/Marie_Haghal/Marie_Haghal_0001.jpg",
+      "detected": false
+    },
+    {
+      "path": "lfw_images/Linda_Franklin/Linda_Franklin_0001.jpg",
+      "detected": false
+    },
+    {
+      "path": "lfw_images/Mohammad_Fares/Mohammad_Fares_0001.jpg",
+      "detected": false
+    },
+    {
+      "path": "lfw_images/Milt_Heflin/Milt_Heflin_0001.jpg",
+      "detected": true,
+      "score": 0.3703621029853821,
+      "box": {
+        "x": 53.62655967473984,
+        "y": 49.36196655035019,
+        "w": 126.0157898068428,
+        "h": 154.325969517231
+      }
+    },
+    {
+      "path": "lfw_images/Patricia_Wartusch/Patricia_Wartusch_0001.jpg",
+      "detected": true,
+      "score": 0.4091154932975769,
+      "box": {
+        "x": 48.591338098049164,
+        "y": 63.45687061548233,
+        "w": 112.27170377969742,
+        "h": 120.62238901853561
+      }
+    },
+    {
+      "path": "lfw_images/Rod_Stewart/Rod_Stewart_0001.jpg",
+      "detected": false
+    },
+    {
+      "path": "lfw_images/Tristan_Gretzky/Tristan_Gretzky_0001.jpg",
+      "detected": false
+    },
+    {
+      "path": "lfw_images/Abid_Hamid_Mahmud_Al-Tikriti/Abid_Hamid_Mahmud_Al-Tikriti_0002.jpg",
+      "detected": true,
+      "score": 0.35467782616615295,
+      "box": {
+        "x": 31.280286610126495,
+        "y": 51.87968164682388,
+        "w": 138.43881338834763,
+        "h": 178.76514047384262
+      }
+    },
+    {
+      "path": "lfw_images/Abid_Hamid_Mahmud_Al-Tikriti/Abid_Hamid_Mahmud_Al-Tikriti_0003.jpg",
+      "detected": true,
+      "score": 0.4110844135284424,
+      "box": {
+        "x": 84.0906947851181,
+        "y": 77.67980545759201,
+        "w": 80.33345639705658,
+        "h": 106.50650411844254
+      }
+    },
+    {
+      "path": "lfw_images/Ali_Khamenei/Ali_Khamenei_0001.jpg",
+      "detected": false
+    },
+    {
+      "path": "lfw_images/Bob_Hope/Bob_Hope_0007.jpg",
+      "detected": false
+    },
+    {
+      "path": "lfw_images/Bridget_Fonda/Bridget_Fonda_0001.jpg",
+      "detected": true,
+      "score": 0.41821539402008057,
+      "box": {
+        "x": 86.14612370729446,
+        "y": 66.85981154441833,
+        "w": 108.37738960981369,
+        "h": 116.1990612745285
+      }
+    },
+    {
+      "path": "lfw_images/Dick_Cheney/Dick_Cheney_0012.jpg",
+      "detected": false
+    },
+    {
+      "path": "lfw_images/Dick_Cheney/Dick_Cheney_0010.jpg",
+      "detected": true,
+      "score": 0.4499800205230713,
+      "box": {
+        "x": 27.861520648002625,
+        "y": 55.4506853222847,
+        "w": 137.66120374202728,
+        "h": 144.74480599164963
+      }
+    },
+    {
+      "path": "lfw_images/Doris_Schroeder/Doris_Schroeder_0001.jpg",
+      "detected": false
+    },
+    {
+      "path": "lfw_images/Doris_Schroeder/Doris_Schroeder_0002.jpg",
+      "detected": false
+    },
+    {
+      "path": "lfw_images/Frank_Lautenberg/Frank_Lautenberg_0001.jpg",
+      "detected": true,
+      "score": 0.3164104223251343,
+      "box": {
+        "x": 92.96707063913345,
+        "y": 55.00490218400955,
+        "w": 110.87577790021896,
+        "h": 154.78097647428513
+      }
+    },
+    {
+      "path": "lfw_images/Frank_Lautenberg/Frank_Lautenberg_0002.jpg",
+      "detected": false
+    },
+    {
+      "path": "lfw_images/George_HW_Bush/George_HW_Bush_0001.jpg",
+      "detected": false
+    },
+    {
+      "path": "lfw_images/George_HW_Bush/George_HW_Bush_0002.jpg",
+      "detected": false
+    },
+    {
+      "path": "lfw_images/George_HW_Bush/George_HW_Bush_0006.jpg",
+      "detected": false
+    },
+    {
+      "path": "lfw_images/George_HW_Bush/George_HW_Bush_0008.jpg",
+      "detected": false
+    },
+    {
+      "path": "lfw_images/Glafcos_Clerides/Glafcos_Clerides_0003.jpg",
+      "detected": true,
+      "score": 0.49206507205963135,
+      "box": {
+        "x": 57.77869373559952,
+        "y": 34.30020064115524,
+        "w": 122.9385957121849,
+        "h": 162.80881315469742
+      }
+    },
+    {
+      "path": "lfw_images/Glafcos_Clerides/Glafcos_Clerides_0004.jpg",
+      "detected": true,
+      "score": 0.34263283014297485,
+      "box": {
+        "x": 88.77966552972794,
+        "y": 38.543909788131714,
+        "w": 114.17429894208908,
+        "h": 154.44840490818024
+      }
+    },
+    {
+      "path": "lfw_images/Hector_Babenco/Hector_Babenco_0001.jpg",
+      "detected": false
+    },
+    {
+      "path": "lfw_images/Hitomi_Soga/Hitomi_Soga_0001.jpg",
+      "detected": true,
+      "score": 0.4922802448272705,
+      "box": {
+        "x": 0.5765743553638458,
+        "y": 9.461544454097748,
+        "w": 60.34344807267189,
+        "h": 94.78306770324707
+      }
+    },
+    {
+      "path": "lfw_images/Jerry_Springer/Jerry_Springer_0002.jpg",
+      "detected": false
+    },
+    {
+      "path": "lfw_images/Joe_Torre/Joe_Torre_0002.jpg",
+      "detected": false
+    },
+    {
+      "path": "lfw_images/Joseph_Biden/Joseph_Biden_0001.jpg",
+      "detected": false
+    },
+    {
+      "path": "lfw_images/Judi_Dench/Judi_Dench_0001.jpg",
+      "detected": true,
+      "score": 0.3041391372680664,
+      "box": {
+        "x": 84.53705161809921,
+        "y": 41.87959432601929,
+        "w": 120.4322949051857,
+        "h": 153.62688899040222
+      }
+    },
+    {
+      "path": "lfw_images/Keanu_Reeves/Keanu_Reeves_0009.jpg",
+      "detected": true,
+      "score": 0.4399673342704773,
+      "box": {
+        "x": 52.48219519853592,
+        "y": 18.72500777244568,
+        "w": 176.34155601263046,
+        "h": 214.9534523487091
+      }
+    },
+    {
+      "path": "lfw_images/Kirk_Ferentz/Kirk_Ferentz_0001.jpg",
+      "detected": false
+    },
+    {
+      "path": "lfw_images/Kirk_Ferentz/Kirk_Ferentz_0002.jpg",
+      "detected": true,
+      "score": 0.43326815962791443,
+      "box": {
+        "x": 85.31126379966736,
+        "y": 67.47567653656006,
+        "w": 85.48343181610107,
+        "h": 105.69605231285095
+      }
+    },
+    {
+      "path": "lfw_images/Lauren_Hutton/Lauren_Hutton_0002.jpg",
+      "detected": false
+    },
+    {
+      "path": "lfw_images/Martin_McCauley/Martin_McCauley_0002.jpg",
+      "detected": false
+    },
+    {
+      "path": "lfw_images/Meghann_Shaughnessy/Meghann_Shaughnessy_0001.jpg",
+      "detected": true,
+      "score": 0.38706719875335693,
+      "box": {
+        "x": 75.17697662115097,
+        "y": 55.56522309780121,
+        "w": 108.27410966157913,
+        "h": 154.7137200832367
+      }
+    },
+    {
+      "path": "lfw_images/Naji_Sabri/Naji_Sabri_0006.jpg",
+      "detected": false
+    },
+    {
+      "path": "lfw_images/Nastassia_Kinski/Nastassia_Kinski_0002.jpg",
+      "detected": false
+    },
+    {
+      "path": "lfw_images/Pat_Burns/Pat_Burns_0002.jpg",
+      "detected": true,
+      "score": 0.328927218914032,
+      "box": {
+        "x": 79.07114923000336,
+        "y": 68.6035305261612,
+        "w": 107.40384459495544,
+        "h": 119.49706077575684
+      }
+    },
+    {
+      "path": "lfw_images/Rubens_Barrichello/Rubens_Barrichello_0005.jpg",
+      "detected": false
+    },
+    {
+      "path": "lfw_images/Rubens_Barrichello/Rubens_Barrichello_0012.jpg",
+      "detected": true,
+      "score": 0.4200725257396698,
+      "box": {
+        "x": 67.42535531520844,
+        "y": 51.737070083618164,
+        "w": 115.47914147377014,
+        "h": 173.88001084327698
+      }
+    },
+    {
+      "path": "lfw_images/Shane_Warne/Shane_Warne_0001.jpg",
+      "detected": false
+    },
+    {
+      "path": "lfw_images/Sheila_Wellstone/Sheila_Wellstone_0002.jpg",
+      "detected": false
+    },
+    {
+      "path": "lfw_images/Taha_Yassin_Ramadan/Taha_Yassin_Ramadan_0012.jpg",
+      "detected": false
+    },
+    {
+      "path": "lfw_images/Tung_Chee-hwa/Tung_Chee-hwa_0001.jpg",
+      "detected": true,
+      "score": 0.41696202754974365,
+      "box": {
+        "x": 3.379121422767639,
+        "y": 64.5722821354866,
+        "w": 67.72419065237045,
+        "h": 101.0899767279625
+      }
+    },
+    {
+      "path": "lfw_images/Vidar_Helgesen/Vidar_Helgesen_0001.jpg",
+      "detected": false
+    },
+    {
+      "path": "lfw_images/Warren_Buffett/Warren_Buffett_0002.jpg",
+      "detected": false
+    },
+    {
+      "path": "lfw_images/Luca_Cordero_di_Montezemolo/Luca_Cordero_di_Montezemolo_0001.jpg",
+      "detected": false
+    },
+    {
+      "path": "lfw_images/Penny_Lancaster/Penny_Lancaster_0001.jpg",
+      "detected": false
+    },
+    {
+      "path": "lfw_images/Art_Lopez/Art_Lopez_0001.jpg",
+      "detected": false
+    },
+    {
+      "path": "lfw_images/Arthur_Johnson/Arthur_Johnson_0001.jpg",
+      "detected": false
+    },
+    {
+      "path": "lfw_images/Brad_Wilk/Brad_Wilk_0001.jpg",
+      "detected": true,
+      "score": 0.37250858545303345,
+      "box": {
+        "x": 83.82865786552429,
+        "y": 58.846380561590195,
+        "w": 76.67265832424164,
+        "h": 114.8121990263462
+      }
+    },
+    {
+      "path": "lfw_images/Scott_Dalton/Scott_Dalton_0001.jpg",
+      "detected": false
+    },
+    {
+      "path": "lfw_images/Simona_Hradil/Simona_Hradil_0001.jpg",
+      "detected": false
+    },
+    {
+      "path": "lfw_images/Clark_Randt/Clark_Randt_0001.jpg",
+      "detected": false
+    },
+    {
+      "path": "lfw_images/Clemente_de_la_Vega/Clemente_de_la_Vega_0001.jpg",
+      "detected": false
+    },
+    {
+      "path": "lfw_images/Jim_Schwarz/Jim_Schwarz_0001.jpg",
+      "detected": false
+    },
+    {
+      "path": "lfw_images/Jonathan_Fine/Jonathan_Fine_0001.jpg",
+      "detected": false
+    },
+    {
+      "path": "lfw_images/Jennifer_Furminger/Jennifer_Furminger_0001.jpg",
+      "detected": false
+    },
+    {
+      "path": "lfw_images/Marianne_Stanley/Marianne_Stanley_0001.jpg",
+      "detected": true,
+      "score": 0.35183489322662354,
+      "box": {
+        "x": 88.02913874387741,
+        "y": 47.22244292497635,
+        "w": 116.13325029611588,
+        "h": 170.06777971982956
+      }
+    },
+    {
+      "path": "lfw_images/John_Thune/John_Thune_0001.jpg",
+      "detected": false
+    },
+    {
+      "path": "lfw_images/Milan_Milutinovic/Milan_Milutinovic_0001.jpg",
+      "detected": false
+    },
+    {
+      "path": "lfw_images/John_Velazquez/John_Velazquez_0001.jpg",
+      "detected": true,
+      "score": 0.4327385723590851,
+      "box": {
+        "x": 52.5355227291584,
+        "y": 76.95348560810089,
+        "w": 114.84333500266075,
+        "h": 99.73600506782532
+      }
+    },
+    {
+      "path": "lfw_images/Uthai_Pimchaichon/Uthai_Pimchaichon_0001.jpg",
+      "detected": false
+    },
+    {
+      "path": "lfw_images/Leland_Chapman/Leland_Chapman_0001.jpg",
+      "detected": true,
+      "score": 0.3737833499908447,
+      "box": {
+        "x": 67.7081048488617,
+        "y": 61.94912642240524,
+        "w": 102.4998277425766,
+        "h": 125.59724599123001
+      }
+    },
+    {
+      "path": "lfw_images/Saoud_Al_Faisal/Saoud_Al_Faisal_0001.jpg",
+      "detected": true,
+      "score": 0.46968770027160645,
+      "box": {
+        "x": 73.98764789104462,
+        "y": 81.61115646362305,
+        "w": 83.8363915681839,
+        "h": 102.37494111061096
+      }
+    },
+    {
+      "path": "lfw_images/Shigeru_Ishiba/Shigeru_Ishiba_0001.jpg",
+      "detected": true,
+      "score": 0.39040374755859375,
+      "box": {
+        "x": 81.65687322616577,
+        "y": 65.76613336801529,
+        "w": 108.44814777374268,
+        "h": 132.77458399534225
+      }
+    },
+    {
+      "path": "lfw_images/Willie_Nelson/Willie_Nelson_0001.jpg",
+      "detected": true,
+      "score": 0.4726216197013855,
+      "box": {
+        "x": 81.19260519742966,
+        "y": 72.10631668567657,
+        "w": 82.34775811433792,
+        "h": 106.21228814125061
+      }
+    },
+    {
+      "path": "lfw_images/Pierre_Van_Hooijdonk/Pierre_Van_Hooijdonk_0001.jpg",
+      "detected": true,
+      "score": 0.4787607491016388,
+      "box": {
+        "x": 59.26975607872009,
+        "y": 51.963649690151215,
+        "w": 110.9708845615387,
+        "h": 143.3626189827919
+      }
+    },
+    {
+      "path": "lfw_images/Abdoulaye_Wade/Abdoulaye_Wade_0002.jpg",
+      "detected": true,
+      "score": 0.4947509467601776,
+      "box": {
+        "x": 71.79205864667892,
+        "y": 51.45952105522156,
+        "w": 114.8752048611641,
+        "h": 131.17358088493347
+      }
+    },
+    {
+      "path": "lfw_images/Abdoulaye_Wade/Abdoulaye_Wade_0003.jpg",
+      "detected": false
+    },
+    {
+      "path": "lfw_images/Al_Pacino/Al_Pacino_0001.jpg",
+      "detected": true,
+      "score": 0.33528923988342285,
+      "box": {
+        "x": 70.00823318958282,
+        "y": 61.20329350233078,
+        "w": 102.1643579006195,
+        "h": 121.92321568727493
+      }
+    },
+    {
+      "path": "lfw_images/Alex_Barros/Alex_Barros_0002.jpg",
+      "detected": true,
+      "score": 0.45057353377342224,
+      "box": {
+        "x": 64.79843705892563,
+        "y": 72.64789938926697,
+        "w": 109.56022888422012,
+        "h": 157.94116258621216
+      }
+    },
+    {
+      "path": "lfw_images/Augusto_Roa_Bastos/Augusto_Roa_Bastos_0001.jpg",
+      "detected": true,
+      "score": 0.4540157616138458,
+      "box": {
+        "x": 50.66458135843277,
+        "y": 53.277596831321716,
+        "w": 118.46943944692612,
+        "h": 132.7168494462967
+      }
+    },
+    {
+      "path": "lfw_images/Celine_Dion/Celine_Dion_0003.jpg",
+      "detected": true,
+      "score": 0.4935624599456787,
+      "box": {
+        "x": 77.70361006259918,
+        "y": 73.93108308315277,
+        "w": 105.07023334503174,
+        "h": 123.76183271408081
+      }
+    },
+    {
+      "path": "lfw_images/Chen_Shui-bian/Chen_Shui-bian_0005.jpg",
+      "detected": false
+    },
+    {
+      "path": "lfw_images/David_Coulthard/David_Coulthard_0001.jpg",
+      "detected": true,
+      "score": 0.3137344717979431,
+      "box": {
+        "x": 74.1543099284172,
+        "y": 53.979821503162384,
+        "w": 101.90112143754959,
+        "h": 116.8011948466301
+      }
+    },
+    {
+      "path": "lfw_images/Eunice_Barber/Eunice_Barber_0001.jpg",
+      "detected": false
+    },
+    {
+      "path": "lfw_images/Fidel_Castro/Fidel_Castro_0001.jpg",
+      "detected": false
+    },
+    {
+      "path": "lfw_images/Franko_Simatovic/Franko_Simatovic_0002.jpg",
+      "detected": false
+    },
+    {
+      "path": "lfw_images/GL_Peiris/GL_Peiris_0002.jpg",
+      "detected": true,
+      "score": 0.38560664653778076,
+      "box": {
+        "x": 40.53863137960434,
+        "y": 44.9550598859787,
+        "w": 133.29393416643143,
+        "h": 148.37880432605743
+      }
+    },
+    {
+      "path": "lfw_images/GL_Peiris/GL_Peiris_0004.jpg",
+      "detected": false
+    },
+    {
+      "path": "lfw_images/John_McCormack/John_McCormack_0001.jpg",
+      "detected": true,
+      "score": 0.46443602442741394,
+      "box": {
+        "x": 174.2434799671173,
+        "y": 114.97893184423447,
+        "w": 72.66294956207275,
+        "h": 108.13076049089432
+      }
+    },
+    {
+      "path": "lfw_images/John_Paul_II/John_Paul_II_0001.jpg",
+      "detected": false
+    },
+    {
+      "path": "lfw_images/John_Paul_II/John_Paul_II_0004.jpg",
+      "detected": false
+    },
+    {
+      "path": "lfw_images/John_Paul_II/John_Paul_II_0002.jpg",
+      "detected": true,
+      "score": 0.36857932806015015,
+      "box": {
+        "x": 80.05748689174652,
+        "y": 81.69721066951752,
+        "w": 109.00148749351501,
+        "h": 75.36688446998596
+      }
+    },
+    {
+      "path": "lfw_images/John_Paul_II/John_Paul_II_0009.jpg",
+      "detected": true,
+      "score": 0.34260982275009155,
+      "box": {
+        "x": 53.71040105819702,
+        "y": 52.84818261861801,
+        "w": 127.9844343662262,
+        "h": 146.67058736085892
+      }
+    },
+    {
+      "path": "lfw_images/John_Paul_II/John_Paul_II_0011.jpg",
+      "detected": false
+    },
+    {
+      "path": "lfw_images/John_Stallworth/John_Stallworth_0001.jpg",
+      "detected": false
+    },
+    {
+      "path": "lfw_images/John_Stallworth/John_Stallworth_0002.jpg",
+      "detected": false
+    },
+    {
+      "path": "lfw_images/Latrell_Sprewell/Latrell_Sprewell_0001.jpg",
+      "detected": false
+    },
+    {
+      "path": "lfw_images/Lech_Walesa/Lech_Walesa_0001.jpg",
+      "detected": false
+    },
+    {
+      "path": "lfw_images/Morgan_Freeman/Morgan_Freeman_0001.jpg",
+      "detected": false
+    },
+    {
+      "path": "lfw_images/Morgan_Freeman/Morgan_Freeman_0002.jpg",
+      "detected": true,
+      "score": 0.40007585287094116,
+      "box": {
+        "x": 41.25718027353287,
+        "y": 33.454105257987976,
+        "w": 193.24355572462082,
+        "h": 216.54589474201202
+      }
+    },
+    {
+      "path": "lfw_images/Muhammad_Ali/Muhammad_Ali_0010.jpg",
+      "detected": true,
+      "score": 0.31353214383125305,
+      "box": {
+        "x": 92.81918406486511,
+        "y": 49.935027956962585,
+        "w": 99.22945499420166,
+        "h": 152.57635712623596
+      }
+    },
+    {
+      "path": "lfw_images/Mukesh_Ambani/Mukesh_Ambani_0002.jpg",
+      "detected": false
+    },
+    {
+      "path": "lfw_images/Pat_Cox/Pat_Cox_0001.jpg",
+      "detected": true,
+      "score": 0.42310312390327454,
+      "box": {
+        "x": 76.07024908065796,
+        "y": 58.92857909202576,
+        "w": 101.07547044754028,
+        "h": 120.88555097579956
+      }
+    },
+    {
+      "path": "lfw_images/Peter_Struck/Peter_Struck_0001.jpg",
+      "detected": false
+    },
+    {
+      "path": "lfw_images/Peter_Struck/Peter_Struck_0002.jpg",
+      "detected": true,
+      "score": 0.42367345094680786,
+      "box": {
+        "x": 33.415354788303375,
+        "y": 32.48269110918045,
+        "w": 134.07369703054428,
+        "h": 165.1017889380455
+      }
+    },
+    {
+      "path": "lfw_images/Ricardo_Maduro/Ricardo_Maduro_0001.jpg",
+      "detected": false
+    },
+    {
+      "path": "lfw_images/Ruben_Studdard/Ruben_Studdard_0001.jpg",
+      "detected": false
+    },
+    {
+      "path": "lfw_images/Tony_Curtis/Tony_Curtis_0001.jpg",
+      "detected": false
+    },
+    {
+      "path": "lfw_images/Vladimiro_Montesinos/Vladimiro_Montesinos_0002.jpg",
+      "detected": false
+    },
+    {
+      "path": "lfw_images/Wayne_Ferreira/Wayne_Ferreira_0004.jpg",
+      "detected": false
+    },
+    {
+      "path": "lfw_images/Yasser_Arafat/Yasser_Arafat_0004.jpg",
+      "detected": false
+    },
+    {
+      "path": "lfw_images/Aaron_Patterson/Aaron_Patterson_0001.jpg",
+      "detected": false
+    },
+    {
+      "path": "lfw_images/Abdoulaye_Wade/Abdoulaye_Wade_0004.jpg",
+      "detected": true,
+      "score": 0.4425704777240753,
+      "box": {
+        "x": 43.73185336589813,
+        "y": 36.7494598031044,
+        "w": 139.16198909282684,
+        "h": 163.61653059720993
+      }
+    },
+    {
+      "path": "lfw_images/Andrzej_Tyszkiewicz/Andrzej_Tyszkiewicz_0001.jpg",
+      "detected": true,
+      "score": 0.468156635761261,
+      "box": {
+        "x": 83.20087194442749,
+        "y": 68.05232912302017,
+        "w": 103.70835661888123,
+        "h": 118.60927194356918
+      }
+    },
+    {
+      "path": "lfw_images/Jessica_Simpson/Jessica_Simpson_0001.jpg",
+      "detected": false
+    },
+    {
+      "path": "lfw_images/Chris_Gratton/Chris_Gratton_0001.jpg",
+      "detected": false
+    },
+    {
+      "path": "lfw_images/Michelle_Hofland/Michelle_Hofland_0001.jpg",
+      "detected": true,
+      "score": 0.46856141090393066,
+      "box": {
+        "x": 67.85129010677338,
+        "y": 68.3310255408287,
+        "w": 103.95725071430206,
+        "h": 115.57082086801529
+      }
+    },
+    {
+      "path": "lfw_images/German_Khan/German_Khan_0001.jpg",
+      "detected": false
+    },
+    {
+      "path": "lfw_images/Tom_McClintock/Tom_McClintock_0001.jpg",
+      "detected": true,
+      "score": 0.46044450998306274,
+      "box": {
+        "x": 69.60146129131317,
+        "y": 59.16370078921318,
+        "w": 103.56034338474274,
+        "h": 123.0517216026783
+      }
+    },
+    {
+      "path": "lfw_images/Brooke_Adams/Brooke_Adams_0001.jpg",
+      "detected": false
+    },
+    {
+      "path": "lfw_images/Calvin_Joseph_Coleman/Calvin_Joseph_Coleman_0001.jpg",
+      "detected": true,
+      "score": 0.4126603305339813,
+      "box": {
+        "x": 76.33600383996964,
+        "y": 66.5469765663147,
+        "w": 104.92482036352158,
+        "h": 119.34474110603333
+      }
+    },
+    {
+      "path": "lfw_images/Sonya_Walger/Sonya_Walger_0001.jpg",
+      "detected": true,
+      "score": 0.32015663385391235,
+      "box": {
+        "x": 80.21818101406097,
+        "y": 67.81426817178726,
+        "w": 107.76177048683167,
+        "h": 117.41628497838974
+      }
+    },
+    {
+      "path": "lfw_images/Garry_Alejano/Garry_Alejano_0001.jpg",
+      "detected": true,
+      "score": 0.3573916256427765,
+      "box": {
+        "x": 90.23924171924591,
+        "y": 61.940617859363556,
+        "w": 84.30129289627075,
+        "h": 111.89233511686325
+      }
+    },
+    {
+      "path": "lfw_images/Charles_Holzner/Charles_Holzner_0001.jpg",
+      "detected": false
+    },
+    {
+      "path": "lfw_images/Craig_Wilson/Craig_Wilson_0001.jpg",
+      "detected": true,
+      "score": 0.36061328649520874,
+      "box": {
+        "x": 68.1174248456955,
+        "y": 60.18543988466263,
+        "w": 103.60077023506165,
+        "h": 128.19185107946396
+      }
+    },
+    {
+      "path": "lfw_images/Darcy_Regier/Darcy_Regier_0001.jpg",
+      "detected": true,
+      "score": 0.37890350818634033,
+      "box": {
+        "x": 12.919828295707703,
+        "y": 22.218912839889526,
+        "w": 155.45770525932312,
+        "h": 175.27973651885986
+      }
+    },
+    {
+      "path": "lfw_images/Roger_Staubach/Roger_Staubach_0001.jpg",
+      "detected": true,
+      "score": 0.4648727476596832,
+      "box": {
+        "x": 85.73730289936066,
+        "y": 61.86090409755707,
+        "w": 101.68087482452393,
+        "h": 134.892076253891
+      }
+    },
+    {
+      "path": "lfw_images/Mike_Leach/Mike_Leach_0001.jpg",
+      "detected": false
+    },
+    {
+      "path": "lfw_images/Gary_Marshall/Gary_Marshall_0001.jpg",
+      "detected": false
+    },
+    {
+      "path": "lfw_images/Grady_Little/Grady_Little_0001.jpg",
+      "detected": false
+    },
+    {
+      "path": "lfw_images/Howard_Ross/Howard_Ross_0001.jpg",
+      "detected": false
+    },
+    {
+      "path": "lfw_images/Tiago_Splitter/Tiago_Splitter_0001.jpg",
+      "detected": false
+    },
+    {
+      "path": "lfw_images/Jim_Jeffords/Jim_Jeffords_0001.jpg",
+      "detected": true,
+      "score": 0.47441262006759644,
+      "box": {
+        "x": 193.8190758228302,
+        "y": 126.9158124923706,
+        "w": 56.1809241771698,
+        "h": 120.35828828811646
+      }
+    },
+    {
+      "path": "lfw_images/Peter_Rasch/Peter_Rasch_0001.jpg",
+      "detected": true,
+      "score": 0.3679378628730774,
+      "box": {
+        "x": 86.16906404495239,
+        "y": 56.151360273361206,
+        "w": 106.66650533676147,
+        "h": 131.43709301948547
+      }
+    },
+    {
+      "path": "lfw_images/Julien_Boutter/Julien_Boutter_0001.jpg",
+      "detected": true,
+      "score": 0.4315190315246582,
+      "box": {
+        "x": 78.72612774372101,
+        "y": 86.20450645685196,
+        "w": 94.5013165473938,
+        "h": 96.10425680875778
+      }
+    },
+    {
+      "path": "lfw_images/Tom_Miller/Tom_Miller_0001.jpg",
+      "detected": false
+    },
+    {
+      "path": "lfw_images/Stacey_Dales-Schuman/Stacey_Dales-Schuman_0001.jpg",
+      "detected": false
+    },
+    {
+      "path": "lfw_images/Stefan_Holm/Stefan_Holm_0001.jpg",
+      "detected": false
+    },
+    {
+      "path": "lfw_images/Amer_al-Saadi/Amer_al-Saadi_0003.jpg",
+      "detected": false
+    },
+    {
+      "path": "lfw_images/Arsinee_Khanjian/Arsinee_Khanjian_0001.jpg",
+      "detected": true,
+      "score": 0.4457804560661316,
+      "box": {
+        "x": 85.4359120130539,
+        "y": 51.83246731758118,
+        "w": 97.32449054718018,
+        "h": 161.30545735359192
+      }
+    },
+    {
+      "path": "lfw_images/Arsinee_Khanjian/Arsinee_Khanjian_0002.jpg",
+      "detected": true,
+      "score": 0.46722880005836487,
+      "box": {
+        "x": 74.44939017295837,
+        "y": 64.19211626052856,
+        "w": 94.86906230449677,
+        "h": 119.20657753944397
+      }
+    },
+    {
+      "path": "lfw_images/Bob_Huggins/Bob_Huggins_0003.jpg",
+      "detected": false
+    },
+    {
+      "path": "lfw_images/Christine_Todd_Whitman/Christine_Todd_Whitman_0002.jpg",
+      "detected": false
+    },
+    {
+      "path": "lfw_images/David_Hyde_Pierce/David_Hyde_Pierce_0001.jpg",
+      "detected": true,
+      "score": 0.40481114387512207,
+      "box": {
+        "x": 53.32687497138977,
+        "y": 60.89570373296738,
+        "w": 104.33971881866455,
+        "h": 117.12760478258133
+      }
+    },
+    {
+      "path": "lfw_images/David_Myers/David_Myers_0002.jpg",
+      "detected": true,
+      "score": 0.4885530471801758,
+      "box": {
+        "x": 82.85510540008545,
+        "y": 60.54319441318512,
+        "w": 96.46573662757874,
+        "h": 128.14688682556152
+      }
+    },
+    {
+      "path": "lfw_images/David_Stern/David_Stern_0002.jpg",
+      "detected": false
+    },
+    {
+      "path": "lfw_images/Edmund_Hillary/Edmund_Hillary_0001.jpg",
+      "detected": false
+    },
+    {
+      "path": "lfw_images/Elisabeth_Schumacher/Elisabeth_Schumacher_0001.jpg",
+      "detected": true,
+      "score": 0.41321027278900146,
+      "box": {
+        "x": 69.58332657814026,
+        "y": 75.24637877941132,
+        "w": 95.947265625,
+        "h": 118.22870373725891
+      }
+    },
+    {
+      "path": "lfw_images/Elizabeth_Smart/Elizabeth_Smart_0005.jpg",
+      "detected": false
+    },
+    {
+      "path": "lfw_images/Fernando_Henrique_Cardoso/Fernando_Henrique_Cardoso_0001.jpg",
+      "detected": false
+    },
+    {
+      "path": "lfw_images/Fernando_Henrique_Cardoso/Fernando_Henrique_Cardoso_0006.jpg",
+      "detected": false
+    },
+    {
+      "path": "lfw_images/Franz_Fischler/Franz_Fischler_0001.jpg",
+      "detected": false
+    },
+    {
+      "path": "lfw_images/Gil_de_Ferran/Gil_de_Ferran_0002.jpg",
+      "detected": false
+    },
+    {
+      "path": "lfw_images/Gil_de_Ferran/Gil_de_Ferran_0004.jpg",
+      "detected": true,
+      "score": 0.454290509223938,
+      "box": {
+        "x": 49.136072397232056,
+        "y": 68.69368255138397,
+        "w": 115.32635986804962,
+        "h": 109.33475196361542
+      }
+    },
+    {
+      "path": "lfw_images/Hermann_Maier/Hermann_Maier_0001.jpg",
+      "detected": true,
+      "score": 0.3203372359275818,
+      "box": {
+        "x": 74.0162804722786,
+        "y": 50.463512539863586,
+        "w": 113.02187293767929,
+        "h": 164.1155481338501
+      }
+    },
+    {
+      "path": "lfw_images/Isabelle_Huppert/Isabelle_Huppert_0002.jpg",
+      "detected": true,
+      "score": 0.39089497923851013,
+      "box": {
+        "x": 72.53959774971008,
+        "y": 62.32843920588493,
+        "w": 99.53929483890533,
+        "h": 114.9403490126133
+      }
+    },
+    {
+      "path": "lfw_images/Jeffrey_Jones/Jeffrey_Jones_0001.jpg",
+      "detected": false
+    },
+    {
+      "path": "lfw_images/Jeffrey_Jones/Jeffrey_Jones_0002.jpg",
+      "detected": false
+    },
+    {
+      "path": "lfw_images/Jim_OBrien/Jim_OBrien_0002.jpg",
+      "detected": true,
+      "score": 0.43243730068206787,
+      "box": {
+        "x": 74.82524961233139,
+        "y": 61.08913570642471,
+        "w": 117.16652661561966,
+        "h": 135.95067709684372
+      }
+    },
+    {
+      "path": "lfw_images/Juergen_Peters/Juergen_Peters_0001.jpg",
+      "detected": false
+    },
+    {
+      "path": "lfw_images/Lloyd_Ward/Lloyd_Ward_0002.jpg",
+      "detected": true,
+      "score": 0.46179530024528503,
+      "box": {
+        "x": 58.21630358695984,
+        "y": 37.98830509185791,
+        "w": 126.85658037662506,
+        "h": 152.08099782466888
+      }
+    },
+    {
+      "path": "lfw_images/Mark_Heller/Mark_Heller_0001.jpg",
+      "detected": true,
+      "score": 0.3486851751804352,
+      "box": {
+        "x": 74.42553341388702,
+        "y": 75.33067464828491,
+        "w": 81.26839995384216,
+        "h": 111.08088493347168
+      }
+    },
+    {
+      "path": "lfw_images/Mark_Heller/Mark_Heller_0002.jpg",
+      "detected": false
+    },
+    {
+      "path": "lfw_images/Marty_Mornhinweg/Marty_Mornhinweg_0003.jpg",
+      "detected": false
+    },
+    {
+      "path": "lfw_images/Nathan_Lane/Nathan_Lane_0001.jpg",
+      "detected": true,
+      "score": 0.3550921380519867,
+      "box": {
+        "x": 63.66439163684845,
+        "y": 84.55978333950043,
+        "w": 105.66514730453491,
+        "h": 123.52949380874634
+      }
+    },
+    {
+      "path": "lfw_images/Patrick_Leahy/Patrick_Leahy_0001.jpg",
+      "detected": true,
+      "score": 0.3767927289009094,
+      "box": {
+        "x": 20.882390439510345,
+        "y": 53.88159304857254,
+        "w": 138.62691074609756,
+        "h": 151.31401270627975
+      }
+    },
+    {
+      "path": "lfw_images/Richard_Gere/Richard_Gere_0001.jpg",
+      "detected": true,
+      "score": 0.44415587186813354,
+      "box": {
+        "x": 37.6555472612381,
+        "y": 76.39645040035248,
+        "w": 114.01547491550446,
+        "h": 104.15136814117432
+      }
+    },
+    {
+      "path": "lfw_images/Richard_Myers/Richard_Myers_0001.jpg",
+      "detected": true,
+      "score": 0.35608887672424316,
+      "box": {
+        "x": 59.00443717837334,
+        "y": 69.02781128883362,
+        "w": 104.3134368956089,
+        "h": 111.73631250858307
+      }
+    },
+    {
+      "path": "lfw_images/Sally_Kirkland/Sally_Kirkland_0001.jpg",
+      "detected": true,
+      "score": 0.46435317397117615,
+      "box": {
+        "x": 38.08920085430145,
+        "y": 44.3597286939621,
+        "w": 134.38472151756287,
+        "h": 143.68954300880432
+      }
+    },
+    {
+      "path": "lfw_images/Sebastian_Saja/Sebastian_Saja_0001.jpg",
+      "detected": false
+    },
+    {
+      "path": "lfw_images/Sila_Calderon/Sila_Calderon_0001.jpg",
+      "detected": true,
+      "score": 0.39700162410736084,
+      "box": {
+        "x": 93.58042478561401,
+        "y": 70.37779688835144,
+        "w": 95.98687291145325,
+        "h": 144.59830522537231
+      }
+    },
+    {
+      "path": "lfw_images/Tang_Jiaxuan/Tang_Jiaxuan_0004.jpg",
+      "detected": false
+    },
+    {
+      "path": "lfw_images/Tang_Jiaxuan/Tang_Jiaxuan_0005.jpg",
+      "detected": false
+    },
+    {
+      "path": "lfw_images/Tang_Jiaxuan/Tang_Jiaxuan_0007.jpg",
+      "detected": true,
+      "score": 0.4020861089229584,
+      "box": {
+        "x": 35.8055979013443,
+        "y": 18.122248351573944,
+        "w": 140.5189484357834,
+        "h": 190.13512879610062
+      }
+    },
+    {
+      "path": "lfw_images/Thomas_Birmingham/Thomas_Birmingham_0001.jpg",
+      "detected": true,
+      "score": 0.30840909481048584,
+      "box": {
+        "x": 72.46440649032593,
+        "y": 72.4906250834465,
+        "w": 99.99573230743408,
+        "h": 110.73369532823563
+      }
+    },
+    {
+      "path": "lfw_images/Thomas_Birmingham/Thomas_Birmingham_0002.jpg",
+      "detected": false
+    },
+    {
+      "path": "lfw_images/Tiger_Woods/Tiger_Woods_0006.jpg",
+      "detected": false
+    },
+    {
+      "path": "lfw_images/Vaclav_Klaus/Vaclav_Klaus_0002.jpg",
+      "detected": false
+    },
+    {
+      "path": "lfw_images/Vladimir_Spidla/Vladimir_Spidla_0002.jpg",
+      "detected": true,
+      "score": 0.36646074056625366,
+      "box": {
+        "x": 87.3965248465538,
+        "y": 59.111088514328,
+        "w": 103.61889749765396,
+        "h": 120.06381154060364
+      }
+    },
+    {
+      "path": "lfw_images/Alain_Cervantes/Alain_Cervantes_0001.jpg",
+      "detected": false
+    },
+    {
+      "path": "lfw_images/Alfredo_Pena/Alfredo_Pena_0001.jpg",
+      "detected": true,
+      "score": 0.31307798624038696,
+      "box": {
+        "x": 59.93535369634628,
+        "y": 82.42641389369965,
+        "w": 104.98294979333878,
+        "h": 115.76735973358154
+      }
+    },
+    {
+      "path": "lfw_images/Gerald_Calabrese/Gerald_Calabrese_0001.jpg",
+      "detected": false
+    },
+    {
+      "path": "lfw_images/Derek_King/Derek_King_0001.jpg",
+      "detected": false
+    },
+    {
+      "path": "lfw_images/Barbara_De_Brun/Barbara_De_Brun_0001.jpg",
+      "detected": false
+    },
+    {
+      "path": "lfw_images/Daniel_Scioli/Daniel_Scioli_0001.jpg",
+      "detected": true,
+      "score": 0.45842230319976807,
+      "box": {
+        "x": 42.66003146767616,
+        "y": 44.53340917825699,
+        "w": 120.64976617693901,
+        "h": 140.6109556555748
+      }
+    },
+    {
+      "path": "lfw_images/Steven_Kinlock/Steven_Kinlock_0001.jpg",
+      "detected": false
+    },
+    {
+      "path": "lfw_images/Bob_Curtis/Bob_Curtis_0001.jpg",
+      "detected": false
+    },
+    {
+      "path": "lfw_images/Carlos_Beltran/Carlos_Beltran_0001.jpg",
+      "detected": false
+    },
+    {
+      "path": "lfw_images/Carlton_Dotson/Carlton_Dotson_0001.jpg",
+      "detected": false
+    },
+    {
+      "path": "lfw_images/Pauline_Landers/Pauline_Landers_0001.jpg",
+      "detected": false
+    },
+    {
+      "path": "lfw_images/Dan_Boyle/Dan_Boyle_0001.jpg",
+      "detected": true,
+      "score": 0.30068790912628174,
+      "box": {
+        "x": 57.828549295663834,
+        "y": 58.38983505964279,
+        "w": 105.50815984606743,
+        "h": 120.58327347040176
+      }
+    },
+    {
+      "path": "lfw_images/Thabo_Mbeki/Thabo_Mbeki_0003.jpg",
+      "detected": true,
+      "score": 0.326468825340271,
+      "box": {
+        "x": 77.56482064723969,
+        "y": 72.98514246940613,
+        "w": 114.64810371398926,
+        "h": 123.22214245796204
+      }
+    },
+    {
+      "path": "lfw_images/Satnarine_Sharma/Satnarine_Sharma_0001.jpg",
+      "detected": false
+    },
+    {
+      "path": "lfw_images/Yasein_Taher/Yasein_Taher_0001.jpg",
+      "detected": false
+    },
+    {
+      "path": "lfw_images/Sereyvuth_Kem/Sereyvuth_Kem_0001.jpg",
+      "detected": false
+    },
+    {
+      "path": "lfw_images/Enrica_Fico/Enrica_Fico_0001.jpg",
+      "detected": true,
+      "score": 0.42395830154418945,
+      "box": {
+        "x": 65.41534513235092,
+        "y": 58.59776958823204,
+        "w": 117.29735881090164,
+        "h": 118.92839148640633
+      }
+    },
+    {
+      "path": "lfw_images/Peter_Mugyeni/Peter_Mugyeni_0001.jpg",
+      "detected": false
+    },
+    {
+      "path": "lfw_images/Vojislav_Seselj/Vojislav_Seselj_0001.jpg",
+      "detected": false
+    },
+    {
+      "path": "lfw_images/Trevor_McDonald/Trevor_McDonald_0001.jpg",
+      "detected": false
+    },
+    {
+      "path": "lfw_images/Jessica_Brungo/Jessica_Brungo_0001.jpg",
+      "detected": false
+    },
+    {
+      "path": "lfw_images/Jose_Canseco_Sr/Jose_Canseco_Sr_0001.jpg",
+      "detected": false
+    },
+    {
+      "path": "lfw_images/Joy_Lee_Sadler/Joy_Lee_Sadler_0001.jpg",
+      "detected": false
+    },
+    {
+      "path": "lfw_images/Keith_Brown/Keith_Brown_0001.jpg",
+      "detected": false
+    },
+    {
+      "path": "lfw_images/Reyyan_Uzuner/Reyyan_Uzuner_0001.jpg",
+      "detected": true,
+      "score": 0.32239216566085815,
+      "box": {
+        "x": 65.95269590616226,
+        "y": 72.36682623624802,
+        "w": 101.58099979162216,
+        "h": 112.93021589517593
+      }
+    },
+    {
+      "path": "lfw_images/Mo_Elleithee/Mo_Elleithee_0001.jpg",
+      "detected": false
+    },
+    {
+      "path": "lfw_images/Scott_Dickson/Scott_Dickson_0001.jpg",
+      "detected": true,
+      "score": 0.3718189299106598,
+      "box": {
+        "x": 51.606908440589905,
+        "y": 36.07271611690521,
+        "w": 133.53128731250763,
+        "h": 144.79821920394897
+      }
+    },
+    {
+      "path": "lfw_images/Alejandro_Toledo/Alejandro_Toledo_0020.jpg",
+      "detected": true,
+      "score": 0.3789971172809601,
+      "box": {
+        "x": 62.39722669124603,
+        "y": 61.9472935795784,
+        "w": 100.8070558309555,
+        "h": 132.3063299059868
+      }
+    },
+    {
+      "path": "lfw_images/Angelo_Reyes/Angelo_Reyes_0001.jpg",
+      "detected": false
+    },
+    {
+      "path": "lfw_images/Billy_Crystal/Billy_Crystal_0002.jpg",
+      "detected": false
+    },
+    {
+      "path": "lfw_images/Charles_Mathews/Charles_Mathews_0002.jpg",
+      "detected": true,
+      "score": 0.4727575182914734,
+      "box": {
+        "x": 54.14310097694397,
+        "y": 68.16694885492325,
+        "w": 130.51536679267883,
+        "h": 135.62562316656113
+      }
+    },
+    {
+      "path": "lfw_images/Dominique_de_Villepin/Dominique_de_Villepin_0013.jpg",
+      "detected": false
+    },
+    {
+      "path": "lfw_images/Elizabeth_Taylor/Elizabeth_Taylor_0002.jpg",
+      "detected": false
+    },
+    {
+      "path": "lfw_images/Gerhard_Schroeder/Gerhard_Schroeder_0100.jpg",
+      "detected": true,
+      "score": 0.3873784840106964,
+      "box": {
+        "x": 51.06518045067787,
+        "y": 65.55119901895523,
+        "w": 107.9978309571743,
+        "h": 119.84824389219284
+      }
+    },
+    {
+      "path": "lfw_images/Gilberto_Rodriguez_Orejuela/Gilberto_Rodriguez_Orejuela_0001.jpg",
+      "detected": false
+    },
+    {
+      "path": "lfw_images/Gilberto_Rodriguez_Orejuela/Gilberto_Rodriguez_Orejuela_0004.jpg",
+      "detected": false
+    },
+    {
+      "path": "lfw_images/John_Rigas/John_Rigas_0001.jpg",
+      "detected": false
+    },
+    {
+      "path": "lfw_images/Julia_Tymoshenko/Julia_Tymoshenko_0001.jpg",
+      "detected": false
+    },
+    {
+      "path": "lfw_images/Kristanna_Loken/Kristanna_Loken_0005.jpg",
+      "detected": true,
+      "score": 0.4210919141769409,
+      "box": {
+        "x": 83.60372483730316,
+        "y": 79.16402071714401,
+        "w": 92.30431914329529,
+        "h": 106.85200244188309
+      }
+    },
+    {
+      "path": "lfw_images/Mahmoud_Abbas/Mahmoud_Abbas_0007.jpg",
+      "detected": false
+    },
+    {
+      "path": "lfw_images/Megan_Mullally/Megan_Mullally_0001.jpg",
+      "detected": false
+    },
+    {
+      "path": "lfw_images/Michael_Caine/Michael_Caine_0002.jpg",
+      "detected": false
+    },
+    {
+      "path": "lfw_images/Michael_Caine/Michael_Caine_0003.jpg",
+      "detected": false
+    },
+    {
+      "path": "lfw_images/Miguel_Contreras/Miguel_Contreras_0001.jpg",
+      "detected": false
+    },
+    {
+      "path": "lfw_images/Miguel_Contreras/Miguel_Contreras_0002.jpg",
+      "detected": false
+    },
+    {
+      "path": "lfw_images/Prince_Charles/Prince_Charles_0003.jpg",
+      "detected": false
+    },
+    {
+      "path": "lfw_images/Prince_Charles/Prince_Charles_0005.jpg",
+      "detected": true,
+      "score": 0.4234611988067627,
+      "box": {
+        "x": 86.93642914295197,
+        "y": 57.44568258523941,
+        "w": 101.99663043022156,
+        "h": 165.6719669699669
+      }
+    },
+    {
+      "path": "lfw_images/Robert_Stack/Robert_Stack_0001.jpg",
+      "detected": true,
+      "score": 0.38782262802124023,
+      "box": {
+        "x": 61.93894147872925,
+        "y": 28.459228575229645,
+        "w": 130.40176033973694,
+        "h": 185.44282764196396
+      }
+    },
+    {
+      "path": "lfw_images/Scott_Peterson/Scott_Peterson_0002.jpg",
+      "detected": false
+    },
+    {
+      "path": "lfw_images/Sonia_Gandhi/Sonia_Gandhi_0004.jpg",
+      "detected": false
+    },
+    {
+      "path": "lfw_images/Tom_Cruise/Tom_Cruise_0005.jpg",
+      "detected": false
+    },
+    {
+      "path": "lfw_images/Tom_Cruise/Tom_Cruise_0004.jpg",
+      "detected": false
+    },
+    {
+      "path": "lfw_images/Tom_Cruise/Tom_Cruise_0006.jpg",
+      "detected": true,
+      "score": 0.4277609884738922,
+      "box": {
+        "x": 24.08692240715027,
+        "y": 36.493778228759766,
+        "w": 147.56637811660767,
+        "h": 201.425701379776
+      }
+    },
+    {
+      "path": "lfw_images/William_Bulger/William_Bulger_0003.jpg",
+      "detected": true,
+      "score": 0.469004362821579,
+      "box": {
+        "x": 133.88051092624664,
+        "y": 0.32823346555233,
+        "w": 116.11948907375336,
+        "h": 49.33536984026432
+      }
+    },
+    {
+      "path": "lfw_images/Xanana_Gusmao/Xanana_Gusmao_0002.jpg",
+      "detected": true,
+      "score": 0.35246336460113525,
+      "box": {
+        "x": 20.986154675483704,
+        "y": 170.7450896501541,
+        "w": 31.793788075447083,
+        "h": 43.69461536407471
+      }
+    },
+    {
+      "path": "lfw_images/Xanana_Gusmao/Xanana_Gusmao_0005.jpg",
+      "detected": false
+    },
+    {
+      "path": "lfw_images/Yashwant_Sinha/Yashwant_Sinha_0003.jpg",
+      "detected": true,
+      "score": 0.4711375832557678,
+      "box": {
+        "x": 74.9291405081749,
+        "y": 68.89747828245163,
+        "w": 99.56122189760208,
+        "h": 112.28404194116592
+      }
+    },
+    {
+      "path": "lfw_images/Ahmed_Ghazi/Ahmed_Ghazi_0001.jpg",
+      "detected": false
+    },
+    {
+      "path": "lfw_images/Oswald_Gruebel/Oswald_Gruebel_0001.jpg",
+      "detected": false
+    },
+    {
+      "path": "lfw_images/Piers_Sellers/Piers_Sellers_0001.jpg",
+      "detected": false
+    },
+    {
+      "path": "lfw_images/Andrea_Kiser/Andrea_Kiser_0001.jpg",
+      "detected": false
+    },
+    {
+      "path": "lfw_images/Anton_Balasingham/Anton_Balasingham_0001.jpg",
+      "detected": false
+    },
+    {
+      "path": "lfw_images/Armando_Avila_Panchame/Armando_Avila_Panchame_0001.jpg",
+      "detected": false
+    },
+    {
+      "path": "lfw_images/Brandon_Boyd/Brandon_Boyd_0001.jpg",
+      "detected": true,
+      "score": 0.42356476187705994,
+      "box": {
+        "x": 76.80094987154007,
+        "y": 44.27007585763931,
+        "w": 117.30169504880905,
+        "h": 171.03948444128036
+      }
+    },
+    {
+      "path": "lfw_images/James_Brosnahan/James_Brosnahan_0001.jpg",
+      "detected": false
+    },
+    {
+      "path": "lfw_images/Bruce_Willis/Bruce_Willis_0001.jpg",
+      "detected": false
+    },
+    {
+      "path": "lfw_images/Bryant_Young/Bryant_Young_0001.jpg",
+      "detected": false
+    },
+    {
+      "path": "lfw_images/Kristin_Scott/Kristin_Scott_0001.jpg",
+      "detected": false
+    },
+    {
+      "path": "lfw_images/Kevin_Satterfield/Kevin_Satterfield_0001.jpg",
+      "detected": false
+    },
+    {
+      "path": "lfw_images/Cheryl_Ford/Cheryl_Ford_0001.jpg",
+      "detected": false
+    },
+    {
+      "path": "lfw_images/Chris_Cookson/Chris_Cookson_0001.jpg",
+      "detected": false
+    },
+    {
+      "path": "lfw_images/Cindy_Zagorski/Cindy_Zagorski_0001.jpg",
+      "detected": false
+    },
+    {
+      "path": "lfw_images/Costas_Simitis/Costas_Simitis_0002.jpg",
+      "detected": false
+    },
+    {
+      "path": "lfw_images/Tommy_Lewis/Tommy_Lewis_0001.jpg",
+      "detected": false
+    },
+    {
+      "path": "lfw_images/Earl_Counter/Earl_Counter_0001.jpg",
+      "detected": true,
+      "score": 0.3575323224067688,
+      "box": {
+        "x": 179.7601282596588,
+        "y": 6.533768028020859,
+        "w": 66.98429584503174,
+        "h": 120.56441977620125
+      }
+    },
+    {
+      "path": "lfw_images/Gary_Coleman/Gary_Coleman_0001.jpg",
+      "detected": false
+    },
+    {
+      "path": "lfw_images/Robert_Nardelli/Robert_Nardelli_0001.jpg",
+      "detected": true,
+      "score": 0.48134952783584595,
+      "box": {
+        "x": 74.06897842884064,
+        "y": 57.69903212785721,
+        "w": 100.98184645175934,
+        "h": 123.08823317289352
+      }
+    },
+    {
+      "path": "lfw_images/Gracia_Burnham/Gracia_Burnham_0001.jpg",
+      "detected": true,
+      "score": 0.3709338903427124,
+      "box": {
+        "x": 86.28623187541962,
+        "y": 67.20767170190811,
+        "w": 103.36214303970337,
+        "h": 116.5071353316307
+      }
+    },
+    {
+      "path": "lfw_images/Isabel_Orellana/Isabel_Orellana_0001.jpg",
+      "detected": true,
+      "score": 0.33314910531044006,
+      "box": {
+        "x": 68.44159960746765,
+        "y": 64.81004506349564,
+        "w": 95.64386308193207,
+        "h": 126.02268904447556
+      }
+    },
+    {
+      "path": "lfw_images/John_Madden/John_Madden_0001.jpg",
+      "detected": false
+    },
+    {
+      "path": "lfw_images/Sun_Myung_Moon/Sun_Myung_Moon_0001.jpg",
+      "detected": true,
+      "score": 0.38272756338119507,
+      "box": {
+        "x": 68.59538704156876,
+        "y": 55.70583790540695,
+        "w": 102.26943343877792,
+        "h": 124.20172244310379
+      }
+    },
+    {
+      "path": "lfw_images/Rodney_Dangerfield/Rodney_Dangerfield_0001.jpg",
+      "detected": true,
+      "score": 0.3861220180988312,
+      "box": {
+        "x": 69.01068985462189,
+        "y": 28.811611235141754,
+        "w": 120.35587430000305,
+        "h": 174.41969364881516
+      }
+    },
+    {
+      "path": "lfw_images/Steve_Austin/Steve_Austin_0001.jpg",
+      "detected": false
+    },
+    {
+      "path": "lfw_images/Pedro_Martinez/Pedro_Martinez_0001.jpg",
+      "detected": false
+    },
+    {
+      "path": "lfw_images/Peter_Harvey/Peter_Harvey_0001.jpg",
+      "detected": false
+    },
+    {
+      "path": "lfw_images/Bruce_Van_De_Velde/Bruce_Van_De_Velde_0002.jpg",
+      "detected": true,
+      "score": 0.3811418116092682,
+      "box": {
+        "x": 84.45122092962265,
+        "y": 71.64634764194489,
+        "w": 104.38532382249832,
+        "h": 107.27939009666443
+      }
+    },
+    {
+      "path": "lfw_images/Charles_Moose/Charles_Moose_0012.jpg",
+      "detected": true,
+      "score": 0.4474349617958069,
+      "box": {
+        "x": 79.34695482254028,
+        "y": 69.72234696149826,
+        "w": 88.03404867649078,
+        "h": 117.33046919107437
+      }
+    },
+    {
+      "path": "lfw_images/Choi_Sung-hong/Choi_Sung-hong_0001.jpg",
+      "detected": false
+    },
+    {
+      "path": "lfw_images/Dick_Latessa/Dick_Latessa_0001.jpg",
+      "detected": true,
+      "score": 0.4008866548538208,
+      "box": {
+        "x": 72.68040627241135,
+        "y": 59.99664217233658,
+        "w": 113.02665621042252,
+        "h": 130.75756281614304
+      }
+    },
+    {
+      "path": "lfw_images/Eduard_Shevardnadze/Eduard_Shevardnadze_0005.jpg",
+      "detected": false
+    },
+    {
+      "path": "lfw_images/Hipolito_Mejia/Hipolito_Mejia_0001.jpg",
+      "detected": false
+    },
+    {
+      "path": "lfw_images/Igor_Ivanov/Igor_Ivanov_0005.jpg",
+      "detected": true,
+      "score": 0.4520164430141449,
+      "box": {
+        "x": 77.33218371868134,
+        "y": 47.98564314842224,
+        "w": 109.7862720489502,
+        "h": 136.17867231369019
+      }
+    },
+    {
+      "path": "lfw_images/James_Kopp/James_Kopp_0002.jpg",
+      "detected": false
+    },
+    {
+      "path": "lfw_images/James_Kopp/James_Kopp_0004.jpg",
+      "detected": true,
+      "score": 0.33769363164901733,
+      "box": {
+        "x": 43.73728483915329,
+        "y": 28.291061520576477,
+        "w": 139.8124173283577,
+        "h": 170.26540637016296
+      }
+    },
+    {
+      "path": "lfw_images/James_Smith/James_Smith_0001.jpg",
+      "detected": false
+    },
+    {
+      "path": "lfw_images/James_Smith/James_Smith_0002.jpg",
+      "detected": false
+    },
+    {
+      "path": "lfw_images/Jean_Chretien/Jean_Chretien_0039.jpg",
+      "detected": true,
+      "score": 0.3625841438770294,
+      "box": {
+        "x": 83.50419253110886,
+        "y": 64.62861597537994,
+        "w": 101.43036395311356,
+        "h": 117.58852005004883
+      }
+    },
+    {
+      "path": "lfw_images/Jean_Chretien/Jean_Chretien_0006.jpg",
+      "detected": false
+    },
+    {
+      "path": "lfw_images/Jean_Chretien/Jean_Chretien_0035.jpg",
+      "detected": false
+    },
+    {
+      "path": "lfw_images/John_Negroponte/John_Negroponte_0017.jpg",
+      "detected": false
+    },
+    {
+      "path": "lfw_images/John_Reilly/John_Reilly_0001.jpg",
+      "detected": true,
+      "score": 0.3264924883842468,
+      "box": {
+        "x": 48.9049069583416,
+        "y": 43.13639551401138,
+        "w": 117.00760200619698,
+        "h": 147.6365551352501
+      }
+    },
+    {
+      "path": "lfw_images/Jon_Corzine/Jon_Corzine_0001.jpg",
+      "detected": true,
+      "score": 0.44299447536468506,
+      "box": {
+        "x": 24.376511573791504,
+        "y": 14.649324119091034,
+        "w": 144.90577578544617,
+        "h": 193.39729100465775
+      }
+    },
+    {
+      "path": "lfw_images/Jose_Dirceu/Jose_Dirceu_0001.jpg",
+      "detected": false
+    },
+    {
+      "path": "lfw_images/Luis_Gonzalez_Macchi/Luis_Gonzalez_Macchi_0002.jpg",
+      "detected": false
+    },
+    {
+      "path": "lfw_images/Luiz_Inacio_Lula_da_Silva/Luiz_Inacio_Lula_da_Silva_0044.jpg",
+      "detected": false
+    },
+    {
+      "path": "lfw_images/Michael_Schumacher/Michael_Schumacher_0017.jpg",
+      "detected": true,
+      "score": 0.40832000970840454,
+      "box": {
+        "x": 71.26642763614655,
+        "y": 79.01895046234131,
+        "w": 99.76458549499512,
+        "h": 109.95572805404663
+      }
+    },
+    {
+      "path": "lfw_images/Nancy_Sinatra/Nancy_Sinatra_0002.jpg",
+      "detected": false
+    },
+    {
+      "path": "lfw_images/Nicanor_Duarte_Frutos/Nicanor_Duarte_Frutos_0006.jpg",
+      "detected": true,
+      "score": 0.46500906348228455,
+      "box": {
+        "x": 44.716134667396545,
+        "y": 63.04837763309479,
+        "w": 123.39438498020172,
+        "h": 120.94616889953613
+      }
+    },
+    {
+      "path": "lfw_images/Richard_Armitage/Richard_Armitage_0002.jpg",
+      "detected": false
+    },
+    {
+      "path": "lfw_images/Richard_Armitage/Richard_Armitage_0005.jpg",
+      "detected": false
+    },
+    {
+      "path": "lfw_images/Richard_Gephardt/Richard_Gephardt_0002.jpg",
+      "detected": true,
+      "score": 0.3789251744747162,
+      "box": {
+        "x": 54.15252596139908,
+        "y": 67.90122389793396,
+        "w": 107.2269007563591,
+        "h": 121.98886275291443
+      }
+    },
+    {
+      "path": "lfw_images/Richard_Norton-Taylor/Richard_Norton-Taylor_0002.jpg",
+      "detected": false
+    },
+    {
+      "path": "lfw_images/Robert_Bullock/Robert_Bullock_0001.jpg",
+      "detected": false
+    },
+    {
+      "path": "lfw_images/Robert_Bullock/Robert_Bullock_0002.jpg",
+      "detected": false
+    },
+    {
+      "path": "lfw_images/Robert_Zoellick/Robert_Zoellick_0007.jpg",
+      "detected": true,
+      "score": 0.3671424388885498,
+      "box": {
+        "x": 62.655262649059296,
+        "y": 20.360030233860016,
+        "w": 162.8413274884224,
+        "h": 186.12688034772873
+      }
+    },
+    {
+      "path": "lfw_images/Roman_Polanski/Roman_Polanski_0003.jpg",
+      "detected": true,
+      "score": 0.4495672583580017,
+      "box": {
+        "x": 71.79909944534302,
+        "y": 65.42856991291046,
+        "w": 96.96903824806213,
+        "h": 103.05415093898773
+      }
+    },
+    {
+      "path": "lfw_images/Shannon_OBrien/Shannon_OBrien_0001.jpg",
+      "detected": true,
+      "score": 0.4587867856025696,
+      "box": {
+        "x": 78.62137258052826,
+        "y": 66.11238420009613,
+        "w": 111.9709312915802,
+        "h": 113.55392634868622
+      }
+    },
+    {
+      "path": "lfw_images/Strom_Thurmond/Strom_Thurmond_0001.jpg",
+      "detected": false
+    },
+    {
+      "path": "lfw_images/Strom_Thurmond/Strom_Thurmond_0003.jpg",
+      "detected": false
+    },
+    {
+      "path": "lfw_images/Terry_Stotts/Terry_Stotts_0002.jpg",
+      "detected": true,
+      "score": 0.39574187994003296,
+      "box": {
+        "x": 92.85058081150055,
+        "y": 74.0935355424881,
+        "w": 86.96740865707397,
+        "h": 103.80774736404419
+      }
+    },
+    {
+      "path": "lfw_images/Tim_Chapman/Tim_Chapman_0001.jpg",
+      "detected": true,
+      "score": 0.3902547359466553,
+      "box": {
+        "x": 1.867402344942093,
+        "y": 20.623929798603058,
+        "w": 62.93804571032524,
+        "h": 157.02085942029953
+      }
+    },
+    {
+      "path": "lfw_images/Victoria_Beckham/Victoria_Beckham_0003.jpg",
+      "detected": true,
+      "score": 0.433468759059906,
+      "box": {
+        "x": 78.83895933628082,
+        "y": 66.92573428153992,
+        "w": 98.0224609375,
+        "h": 107.67410695552826
+      }
+    },
+    {
+      "path": "lfw_images/Yasar_Yakis/Yasar_Yakis_0004.jpg",
+      "detected": false
+    },
+    {
+      "path": "lfw_images/Alan_Dreher/Alan_Dreher_0001.jpg",
+      "detected": false
+    },
+    {
+      "path": "lfw_images/John_Jones/John_Jones_0001.jpg",
+      "detected": false
+    },
+    {
+      "path": "lfw_images/Brian_Lara/Brian_Lara_0001.jpg",
+      "detected": false
+    },
+    {
+      "path": "lfw_images/Jose_Sarney/Jose_Sarney_0002.jpg",
+      "detected": true,
+      "score": 0.34530889987945557,
+      "box": {
+        "x": 71.27393782138824,
+        "y": 64.90979343652725,
+        "w": 108.51958394050598,
+        "h": 135.85525006055832
+      }
+    },
+    {
+      "path": "lfw_images/Cori_Enghusen/Cori_Enghusen_0001.jpg",
+      "detected": true,
+      "score": 0.36914777755737305,
+      "box": {
+        "x": 76.91460847854614,
+        "y": 70.18429040908813,
+        "w": 76.74510776996613,
+        "h": 113.22739720344543
+      }
+    },
+    {
+      "path": "lfw_images/Ernie_Stewart/Ernie_Stewart_0001.jpg",
+      "detected": true,
+      "score": 0.37959858775138855,
+      "box": {
+        "x": 70.57023048400879,
+        "y": 80.53458482027054,
+        "w": 101.5854924917221,
+        "h": 102.41328924894333
+      }
+    },
+    {
+      "path": "lfw_images/Daryl_Smith/Daryl_Smith_0001.jpg",
+      "detected": true,
+      "score": 0.44113239645957947,
+      "box": {
+        "x": 70.43826580047607,
+        "y": 64.45888429880142,
+        "w": 112.66115307807922,
+        "h": 117.47252196073532
+      }
+    },
+    {
+      "path": "lfw_images/Theo_Angelopoulos/Theo_Angelopoulos_0001.jpg",
+      "detected": false
+    },
+    {
+      "path": "lfw_images/Nathan_Doudney/Nathan_Doudney_0001.jpg",
+      "detected": true,
+      "score": 0.3781614899635315,
+      "box": {
+        "x": 76.35582983493805,
+        "y": 70.69201022386551,
+        "w": 97.87312150001526,
+        "h": 134.52207297086716
+      }
+    },
+    {
+      "path": "lfw_images/Shane_Reynolds/Shane_Reynolds_0001.jpg",
+      "detected": false
+    },
+    {
+      "path": "lfw_images/Nestor_Santillan/Nestor_Santillan_0001.jpg",
+      "detected": true,
+      "score": 0.34116464853286743,
+      "box": {
+        "x": 84.36678349971771,
+        "y": 57.01002851128578,
+        "w": 98.63796830177307,
+        "h": 101.95640847086906
+      }
+    },
+    {
+      "path": "lfw_images/Strom_Thurmond/Strom_Thurmond_0002.jpg",
+      "detected": false
+    },
+    {
+      "path": "lfw_images/Jennifer_Aniston/Jennifer_Aniston_0017.jpg",
+      "detected": false
+    },
+    {
+      "path": "lfw_images/Kwame_Kilpatrick/Kwame_Kilpatrick_0001.jpg",
+      "detected": false
+    },
+    {
+      "path": "lfw_images/Richard_Armitage/Richard_Armitage_0001.jpg",
+      "detected": false
+    },
+    {
+      "path": "lfw_images/Queen_Beatrix/Queen_Beatrix_0004.jpg",
+      "detected": false
+    },
+    {
+      "path": "lfw_images/Lee_Byung-woong/Lee_Byung-woong_0001.jpg",
+      "detected": true,
+      "score": 0.31780970096588135,
+      "box": {
+        "x": 75.98155736923218,
+        "y": 59.514082968235016,
+        "w": 105.82131147384644,
+        "h": 125.04761666059494
+      }
+    },
+    {
+      "path": "lfw_images/Loretta_Lynn_Harper/Loretta_Lynn_Harper_0001.jpg",
+      "detected": true,
+      "score": 0.39389652013778687,
+      "box": {
+        "x": 53.30194905400276,
+        "y": 67.0224204659462,
+        "w": 105.51532730460167,
+        "h": 113.94446343183517
+      }
+    },
+    {
+      "path": "lfw_images/Matt_Roney/Matt_Roney_0001.jpg",
+      "detected": false
+    },
+    {
+      "path": "lfw_images/Michael_Shane_Jolly/Michael_Shane_Jolly_0001.jpg",
+      "detected": true,
+      "score": 0.390662282705307,
+      "box": {
+        "x": 79.46532964706421,
+        "y": 60.93798577785492,
+        "w": 99.94161128997803,
+        "h": 129.03040647506714
+      }
+    },
+    {
+      "path": "lfw_images/Rina_Lazo/Rina_Lazo_0001.jpg",
+      "detected": true,
+      "score": 0.3235304057598114,
+      "box": {
+        "x": 77.77456939220428,
+        "y": 68.73618811368942,
+        "w": 106.39777779579163,
+        "h": 126.28332525491714
+      }
+    },
+    {
+      "path": "lfw_images/Arnold_Schwarzenegger/Arnold_Schwarzenegger_0037.jpg",
+      "detected": false
+    },
+    {
+      "path": "lfw_images/Beth_Jones/Beth_Jones_0002.jpg",
+      "detected": false
+    },
+    {
+      "path": "lfw_images/Charlton_Heston/Charlton_Heston_0004.jpg",
+      "detected": false
+    },
+    {
+      "path": "lfw_images/Chung_Mong-hun/Chung_Mong-hun_0001.jpg",
+      "detected": false
+    },
+    {
+      "path": "lfw_images/Colin_Montgomerie/Colin_Montgomerie_0001.jpg",
+      "detected": true,
+      "score": 0.4860232472419739,
+      "box": {
+        "x": 77.89961993694305,
+        "y": 66.50034338235855,
+        "w": 109.41559076309204,
+        "h": 138.52375000715256
+      }
+    },
+    {
+      "path": "lfw_images/Colin_Montgomerie/Colin_Montgomerie_0004.jpg",
+      "detected": false
+    },
+    {
+      "path": "lfw_images/David_Wolf/David_Wolf_0002.jpg",
+      "detected": false
+    },
+    {
+      "path": "lfw_images/Emanuel_Ginobili/Emanuel_Ginobili_0003.jpg",
+      "detected": true,
+      "score": 0.3879903554916382,
+      "box": {
+        "x": 87.99170702695847,
+        "y": 57.962529361248016,
+        "w": 76.12902671098709,
+        "h": 118.80040913820267
+      }
+    },
+    {
+      "path": "lfw_images/Ferenc_Madl/Ferenc_Madl_0002.jpg",
+      "detected": false
+    },
+    {
+      "path": "lfw_images/Franz_Muentefering/Franz_Muentefering_0003.jpg",
+      "detected": false
+    },
+    {
+      "path": "lfw_images/George_Foreman/George_Foreman_0001.jpg",
+      "detected": true,
+      "score": 0.35429584980010986,
+      "box": {
+        "x": 74.40837472677231,
+        "y": 57.08661302924156,
+        "w": 109.33265835046768,
+        "h": 124.73969534039497
+      }
+    },
+    {
+      "path": "lfw_images/Hamid_Karzai/Hamid_Karzai_0013.jpg",
+      "detected": false
+    },
+    {
+      "path": "lfw_images/John_Kerry/John_Kerry_0012.jpg",
+      "detected": false
+    },
+    {
+      "path": "lfw_images/John_McEnroe/John_McEnroe_0001.jpg",
+      "detected": false
+    },
+    {
+      "path": "lfw_images/Kathleen_Glynn/Kathleen_Glynn_0001.jpg",
+      "detected": false
+    },
+    {
+      "path": "lfw_images/Kim_Dae-jung/Kim_Dae-jung_0003.jpg",
+      "detected": false
+    },
+    {
+      "path": "lfw_images/Kim_Dae-jung/Kim_Dae-jung_0005.jpg",
+      "detected": false
+    },
+    {
+      "path": "lfw_images/Kim_Dae-jung/Kim_Dae-jung_0002.jpg",
+      "detected": false
+    },
+    {
+      "path": "lfw_images/Kurt_Russell/Kurt_Russell_0001.jpg",
+      "detected": true,
+      "score": 0.310957670211792,
+      "box": {
+        "x": 74.14305955171585,
+        "y": 62.67446279525757,
+        "w": 100.19724816083908,
+        "h": 112.25040256977081
+      }
+    },
+    {
+      "path": "lfw_images/Lucio_Gutierrez/Lucio_Gutierrez_0007.jpg",
+      "detected": false
+    },
+    {
+      "path": "lfw_images/Masahiko_Nagasawa/Masahiko_Nagasawa_0001.jpg",
+      "detected": false
+    },
+    {
+      "path": "lfw_images/Michael_Douglas/Michael_Douglas_0006.jpg",
+      "detected": false
+    },
+    {
+      "path": "lfw_images/Muammar_Gaddafi/Muammar_Gaddafi_0001.jpg",
+      "detected": true,
+      "score": 0.40043288469314575,
+      "box": {
+        "x": 83.61263573169708,
+        "y": 89.48732912540436,
+        "w": 113.14120888710022,
+        "h": 102.8185486793518
+      }
+    },
+    {
+      "path": "lfw_images/Nadia_Petrova/Nadia_Petrova_0003.jpg",
+      "detected": true,
+      "score": 0.49231985211372375,
+      "box": {
+        "x": 45.265763998031616,
+        "y": 52.39760875701904,
+        "w": 147.52623438835144,
+        "h": 162.14525699615479
+      }
+    },
+    {
+      "path": "lfw_images/Nadia_Petrova/Nadia_Petrova_0005.jpg",
+      "detected": true,
+      "score": 0.3901023864746094,
+      "box": {
+        "x": 15.342459082603455,
+        "y": 52.23041772842407,
+        "w": 147.96476066112518,
+        "h": 153.47707271575928
+      }
+    },
+    {
+      "path": "lfw_images/Pascal_Quignard/Pascal_Quignard_0003.jpg",
+      "detected": false
+    },
+    {
+      "path": "lfw_images/Rainer_Schuettler/Rainer_Schuettler_0003.jpg",
+      "detected": true,
+      "score": 0.41584545373916626,
+      "box": {
+        "x": 50.12413114309311,
+        "y": 78.49704474210739,
+        "w": 136.62151247262955,
+        "h": 128.4639611840248
+      }
+    },
+    {
+      "path": "lfw_images/Rick_Santorum/Rick_Santorum_0003.jpg",
+      "detected": true,
+      "score": 0.32057684659957886,
+      "box": {
+        "x": 90.7014012336731,
+        "y": 62.618188560009,
+        "w": 106.3779890537262,
+        "h": 159.53508764505386
+      }
+    },
+    {
+      "path": "lfw_images/Robert_Blackwill/Robert_Blackwill_0001.jpg",
+      "detected": true,
+      "score": 0.4080852270126343,
+      "box": {
+        "x": 28.785251080989838,
+        "y": 30.209273099899292,
+        "w": 146.28858119249344,
+        "h": 175.9551614522934
+      }
+    },
+    {
+      "path": "lfw_images/Roger_Clemens/Roger_Clemens_0001.jpg",
+      "detected": true,
+      "score": 0.46983009576797485,
+      "box": {
+        "x": 84.48616415262222,
+        "y": 73.34530353546143,
+        "w": 102.354995906353,
+        "h": 110.51645874977112
+      }
+    },
+    {
+      "path": "lfw_images/Serena_Williams/Serena_Williams_0041.jpg",
+      "detected": false
+    },
+    {
+      "path": "lfw_images/Steve_Spurrier/Steve_Spurrier_0002.jpg",
+      "detected": false
+    },
+    {
+      "path": "lfw_images/Susilo_Bambang_Yudhoyono/Susilo_Bambang_Yudhoyono_0001.jpg",
+      "detected": false
+    },
+    {
+      "path": "lfw_images/Thomas_Bjorn/Thomas_Bjorn_0001.jpg",
+      "detected": true,
+      "score": 0.33282148838043213,
+      "box": {
+        "x": 120.17829716205597,
+        "y": 195.82825899124146,
+        "w": 17.925560474395752,
+        "h": 18.392115831375122
+      }
+    },
+    {
+      "path": "lfw_images/Abdullah_al-Attiyah/Abdullah_al-Attiyah_0001.jpg",
+      "detected": false
+    },
+    {
+      "path": "lfw_images/Nicolas_Massu/Nicolas_Massu_0001.jpg",
+      "detected": false
+    },
+    {
+      "path": "lfw_images/Aiysha_Smith/Aiysha_Smith_0001.jpg",
+      "detected": false
+    },
+    {
+      "path": "lfw_images/Aleksander_Voloshin/Aleksander_Voloshin_0001.jpg",
+      "detected": false
+    },
+    {
+      "path": "lfw_images/Charles_Tannok/Charles_Tannok_0001.jpg",
+      "detected": false
+    },
+    {
+      "path": "lfw_images/James_Coburn/James_Coburn_0001.jpg",
+      "detected": false
+    },
+    {
+      "path": "lfw_images/Carla_Gugino/Carla_Gugino_0001.jpg",
+      "detected": false
+    },
+    {
+      "path": "lfw_images/Chuck_Hagel/Chuck_Hagel_0001.jpg",
+      "detected": true,
+      "score": 0.40062281489372253,
+      "box": {
+        "x": 56.88610300421715,
+        "y": 50.35463720560074,
+        "w": 114.62165787816048,
+        "h": 137.4531015753746
+      }
+    },
+    {
+      "path": "lfw_images/Jeff_Roehm/Jeff_Roehm_0001.jpg",
+      "detected": true,
+      "score": 0.33114778995513916,
+      "box": {
+        "x": 61.38328090310097,
+        "y": 64.43782150745392,
+        "w": 111.40630766749382,
+        "h": 123.33038449287415
+      }
+    },
+    {
+      "path": "lfw_images/Sebastian_Porto/Sebastian_Porto_0001.jpg",
+      "detected": true,
+      "score": 0.4734177589416504,
+      "box": {
+        "x": 81.81119710206985,
+        "y": 49.483150243759155,
+        "w": 127.5084838271141,
+        "h": 179.92231249809265
+      }
+    },
+    {
+      "path": "lfw_images/Clive_Lloyd/Clive_Lloyd_0001.jpg",
+      "detected": false
+    },
+    {
+      "path": "lfw_images/Omar_Khan_Sharif/Omar_Khan_Sharif_0001.jpg",
+      "detected": true,
+      "score": 0.3684866726398468,
+      "box": {
+        "x": 62.71339952945709,
+        "y": 50.981976091861725,
+        "w": 110.06037890911102,
+        "h": 137.4286338686943
+      }
+    },
+    {
+      "path": "lfw_images/Ed_Book/Ed_Book_0001.jpg",
+      "detected": false
+    },
+    {
+      "path": "lfw_images/Sven_Goran_Eriksson/Sven_Goran_Eriksson_0001.jpg",
+      "detected": false
+    },
+    {
+      "path": "lfw_images/George_Pataki/George_Pataki_0002.jpg",
+      "detected": false
+    },
+    {
+      "path": "lfw_images/Gonzalo_Sanchez_de_Lozada/Gonzalo_Sanchez_de_Lozada_0003.jpg",
+      "detected": false
+    },
+    {
+      "path": "lfw_images/Gustavo_Noboa/Gustavo_Noboa_0001.jpg",
+      "detected": true,
+      "score": 0.45478150248527527,
+      "box": {
+        "x": 76.24690979719162,
+        "y": 39.54519331455231,
+        "w": 127.70841270685196,
+        "h": 185.67082285881042
+      }
+    },
+    {
+      "path": "lfw_images/Paul_Wilson/Paul_Wilson_0001.jpg",
+      "detected": false
+    },
+    {
+      "path": "lfw_images/Ian_Knop/Ian_Knop_0001.jpg",
+      "detected": true,
+      "score": 0.35076403617858887,
+      "box": {
+        "x": 76.08284056186676,
+        "y": 39.5093709230423,
+        "w": 112.13871836662292,
+        "h": 169.3880409002304
+      }
+    },
+    {
+      "path": "lfw_images/Ismail_Abu_Shanab/Ismail_Abu_Shanab_0001.jpg",
+      "detected": true,
+      "score": 0.3621077537536621,
+      "box": {
+        "x": 53.50763723254204,
+        "y": 56.55559152364731,
+        "w": 99.97997060418129,
+        "h": 134.17411595582962
+      }
+    },
+    {
+      "path": "lfw_images/Patrick_Ewing/Patrick_Ewing_0001.jpg",
+      "detected": false
+    },
+    {
+      "path": "lfw_images/Reggie_Sanders/Reggie_Sanders_0001.jpg",
+      "detected": true,
+      "score": 0.4428444504737854,
+      "box": {
+        "x": 77.6989534497261,
+        "y": 66.24582409858704,
+        "w": 100.570909678936,
+        "h": 124.2893934249878
+      }
+    },
+    {
+      "path": "lfw_images/Jerry_Oliver/Jerry_Oliver_0001.jpg",
+      "detected": false
+    },
+    {
+      "path": "lfw_images/Lawrence_Foley/Lawrence_Foley_0001.jpg",
+      "detected": false
+    },
+    {
+      "path": "lfw_images/Lucio_Angulo/Lucio_Angulo_0001.jpg",
+      "detected": false
+    },
+    {
+      "path": "lfw_images/Max_Baucus/Max_Baucus_0001.jpg",
+      "detected": false
+    },
+    {
+      "path": "lfw_images/Michael_Doleac/Michael_Doleac_0001.jpg",
+      "detected": false
+    },
+    {
+      "path": "lfw_images/Michelle_Bachelet/Michelle_Bachelet_0001.jpg",
+      "detected": true,
+      "score": 0.4919683337211609,
+      "box": {
+        "x": 75.54300129413605,
+        "y": 75.07789134979248,
+        "w": 92.27745234966278,
+        "h": 109.69138145446777
+      }
+    },
+    {
+      "path": "lfw_images/Mike_Bryan/Mike_Bryan_0001.jpg",
+      "detected": false
+    },
+    {
+      "path": "lfw_images/Patrick_Ewing/Patrick_Ewing_0002.jpg",
+      "detected": false
+    },
+    {
+      "path": "lfw_images/Adrian_McPherson/Adrian_McPherson_0001.jpg",
+      "detected": true,
+      "score": 0.38136598467826843,
+      "box": {
+        "x": 79.44005727767944,
+        "y": 80.594003200531,
+        "w": 78.44458520412445,
+        "h": 89.983731508255
+      }
+    },
+    {
+      "path": "lfw_images/Adrian_McPherson/Adrian_McPherson_0002.jpg",
+      "detected": true,
+      "score": 0.4976390302181244,
+      "box": {
+        "x": 83.85027199983597,
+        "y": 74.10099357366562,
+        "w": 105.56366294622421,
+        "h": 127.4920180439949
+      }
+    },
+    {
+      "path": "lfw_images/Alexander_Downer/Alexander_Downer_0004.jpg",
+      "detected": true,
+      "score": 0.4842070937156677,
+      "box": {
+        "x": 83.29176902770996,
+        "y": 33.5472896695137,
+        "w": 107.75461792945862,
+        "h": 161.5249142050743
+      }
+    },
+    {
+      "path": "lfw_images/Alvaro_Uribe/Alvaro_Uribe_0025.jpg",
+      "detected": true,
+      "score": 0.35942304134368896,
+      "box": {
+        "x": 72.49961793422699,
+        "y": 58.0504834651947,
+        "w": 97.44352102279663,
+        "h": 128.22523713111877
+      }
+    },
+    {
+      "path": "lfw_images/Carlos_Moya/Carlos_Moya_0017.jpg",
+      "detected": false
+    },
+    {
+      "path": "lfw_images/Dennis_Hastert/Dennis_Hastert_0003.jpg",
+      "detected": true,
+      "score": 0.36368340253829956,
+      "box": {
+        "x": 68.83653253316879,
+        "y": 82.66204595565796,
+        "w": 102.32136398553848,
+        "h": 109.92187261581421
+      }
+    },
+    {
+      "path": "lfw_images/Dennis_Hastert/Dennis_Hastert_0006.jpg",
+      "detected": true,
+      "score": 0.41638538241386414,
+      "box": {
+        "x": 56.0954287648201,
+        "y": 66.8875128030777,
+        "w": 113.3025512099266,
+        "h": 117.92278289794922
+      }
+    },
+    {
+      "path": "lfw_images/Dennis_Hastert/Dennis_Hastert_0004.jpg",
+      "detected": false
+    },
+    {
+      "path": "lfw_images/Doug_Duncan/Doug_Duncan_0002.jpg",
+      "detected": true,
+      "score": 0.3665292263031006,
+      "box": {
+        "x": 90.15488624572754,
+        "y": 60.27090549468994,
+        "w": 112.88240551948547,
+        "h": 132.5717270374298
+      }
+    },
+    {
+      "path": "lfw_images/Eliane_Karp/Eliane_Karp_0004.jpg",
+      "detected": true,
+      "score": 0.38747256994247437,
+      "box": {
+        "x": 78.0513808131218,
+        "y": 68.62793862819672,
+        "w": 98.79133850336075,
+        "h": 108.92170667648315
+      }
+    },
+    {
+      "path": "lfw_images/Erika_Harold/Erika_Harold_0004.jpg",
+      "detected": true,
+      "score": 0.4700387120246887,
+      "box": {
+        "x": 61.55310943722725,
+        "y": 68.55034083127975,
+        "w": 102.93246433138847,
+        "h": 129.8241689801216
+      }
+    },
+    {
+      "path": "lfw_images/Gabriel_Batistuta/Gabriel_Batistuta_0002.jpg",
+      "detected": true,
+      "score": 0.3304122984409332,
+      "box": {
+        "x": 70.65226137638092,
+        "y": 62.45255470275879,
+        "w": 103.83351147174835,
+        "h": 132.50315189361572
+      }
+    },
+    {
+      "path": "lfw_images/Gary_Doer/Gary_Doer_0001.jpg",
+      "detected": false
+    },
+    {
+      "path": "lfw_images/Gary_Doer/Gary_Doer_0003.jpg",
+      "detected": true,
+      "score": 0.38092124462127686,
+      "box": {
+        "x": 66.23443961143494,
+        "y": 70.09768486022949,
+        "w": 107.52148926258087,
+        "h": 118.73432993888855
+      }
+    },
+    {
+      "path": "lfw_images/Georgi_Parvanov/Georgi_Parvanov_0002.jpg",
+      "detected": false
+    },
+    {
+      "path": "lfw_images/Goldie_Hawn/Goldie_Hawn_0001.jpg",
+      "detected": false
+    },
+    {
+      "path": "lfw_images/Goldie_Hawn/Goldie_Hawn_0003.jpg",
+      "detected": true,
+      "score": 0.419674277305603,
+      "box": {
+        "x": 55.7335764169693,
+        "y": 60.77864393591881,
+        "w": 112.85066604614258,
+        "h": 122.80223146080971
+      }
+    },
+    {
+      "path": "lfw_images/Guillaume_Soro/Guillaume_Soro_0001.jpg",
+      "detected": true,
+      "score": 0.35955366492271423,
+      "box": {
+        "x": 56.739527732133865,
+        "y": 69.00119036436081,
+        "w": 113.30069229006767,
+        "h": 128.03832441568375
+      }
+    },
+    {
+      "path": "lfw_images/Jeong_Se-hyun/Jeong_Se-hyun_0008.jpg",
+      "detected": true,
+      "score": 0.32040858268737793,
+      "box": {
+        "x": 65.89061766862869,
+        "y": 54.39901351928711,
+        "w": 105.23691028356552,
+        "h": 128.4879893064499
+      }
+    },
+    {
+      "path": "lfw_images/Jeong_Se-hyun/Jeong_Se-hyun_0009.jpg",
+      "detected": false
+    },
+    {
+      "path": "lfw_images/Jo_Dee_Messina/Jo_Dee_Messina_0002.jpg",
+      "detected": true,
+      "score": 0.43858641386032104,
+      "box": {
+        "x": 58.66166576743126,
+        "y": 66.39429181814194,
+        "w": 116.04014411568642,
+        "h": 116.71701818704605
+      }
+    },
+    {
+      "path": "lfw_images/Joe_Lieberman/Joe_Lieberman_0008.jpg",
+      "detected": true,
+      "score": 0.38609763979911804,
+      "box": {
+        "x": 65.57129323482513,
+        "y": 72.7304220199585,
+        "w": 117.17873811721802,
+        "h": 108.74146223068237
+      }
+    },
+    {
+      "path": "lfw_images/John_Allen_Muhammad/John_Allen_Muhammad_0002.jpg",
+      "detected": true,
+      "score": 0.3700282573699951,
+      "box": {
+        "x": 55.68891018629074,
+        "y": 59.735752642154694,
+        "w": 107.74583369493484,
+        "h": 127.00029462575912
+      }
+    },
+    {
+      "path": "lfw_images/John_Allen_Muhammad/John_Allen_Muhammad_0010.jpg",
+      "detected": true,
+      "score": 0.3492391109466553,
+      "box": {
+        "x": 54.25300449132919,
+        "y": 63.240498304367065,
+        "w": 105.5159643292427,
+        "h": 133.4206461906433
+      }
+    },
+    {
+      "path": "lfw_images/Joseph_Deiss/Joseph_Deiss_0001.jpg",
+      "detected": true,
+      "score": 0.421711266040802,
+      "box": {
+        "x": 59.008609503507614,
+        "y": 65.41535258293152,
+        "w": 112.58536949753761,
+        "h": 126.93208456039429
+      }
+    },
+    {
+      "path": "lfw_images/Kim_Ryong-sung/Kim_Ryong-sung_0011.jpg",
+      "detected": false
+    },
+    {
+      "path": "lfw_images/Larry_Brown/Larry_Brown_0001.jpg",
+      "detected": true,
+      "score": 0.4358398914337158,
+      "box": {
+        "x": 60.59608608484268,
+        "y": 61.14303693175316,
+        "w": 110.14502495527267,
+        "h": 123.21065738797188
+      }
+    },
+    {
+      "path": "lfw_images/Larry_Brown/Larry_Brown_0003.jpg",
+      "detected": false
+    },
+    {
+      "path": "lfw_images/Mel_Brooks/Mel_Brooks_0002.jpg",
+      "detected": true,
+      "score": 0.4760878086090088,
+      "box": {
+        "x": 47.76729270815849,
+        "y": 55.34972995519638,
+        "w": 124.5686300098896,
+        "h": 151.50625258684158
+      }
+    },
+    {
+      "path": "lfw_images/Mel_Gibson/Mel_Gibson_0002.jpg",
+      "detected": false
+    },
+    {
+      "path": "lfw_images/Nabil_Shaath/Nabil_Shaath_0001.jpg",
+      "detected": false
+    },
+    {
+      "path": "lfw_images/Nabil_Shaath/Nabil_Shaath_0002.jpg",
+      "detected": true,
+      "score": 0.3252828121185303,
+      "box": {
+        "x": 40.24884104728699,
+        "y": 41.21845215559006,
+        "w": 209.751158952713,
+        "h": 201.62517577409744
+      }
+    },
+    {
+      "path": "lfw_images/Naomi_Watts/Naomi_Watts_0006.jpg",
+      "detected": true,
+      "score": 0.4992595314979553,
+      "box": {
+        "x": 82.4722945690155,
+        "y": 68.53832304477692,
+        "w": 100.62748193740845,
+        "h": 121.60158157348633
+      }
+    },
+    {
+      "path": "lfw_images/Oleksandr_Moroz/Oleksandr_Moroz_0002.jpg",
+      "detected": false
+    },
+    {
+      "path": "lfw_images/Paul-Henri_Mathieu/Paul-Henri_Mathieu_0001.jpg",
+      "detected": false
+    },
+    {
+      "path": "lfw_images/Ranil_Wickremasinghe/Ranil_Wickremasinghe_0002.jpg",
+      "detected": true,
+      "score": 0.4626404941082001,
+      "box": {
+        "x": 50.32357573509216,
+        "y": 72.97898083925247,
+        "w": 108.4880381822586,
+        "h": 115.5955120921135
+      }
+    },
+    {
+      "path": "lfw_images/Rudolph_Giuliani/Rudolph_Giuliani_0003.jpg",
+      "detected": false
+    },
+    {
+      "path": "lfw_images/Stellan_Skarsgard/Stellan_Skarsgard_0002.jpg",
+      "detected": true,
+      "score": 0.4567328691482544,
+      "box": {
+        "x": 90.4390960931778,
+        "y": 56.61109834909439,
+        "w": 113.68921399116516,
+        "h": 139.11964744329453
+      }
+    },
+    {
+      "path": "lfw_images/Vicente_Fernandez/Vicente_Fernandez_0004.jpg",
+      "detected": false
+    },
+    {
+      "path": "lfw_images/Zinedine_Zidane/Zinedine_Zidane_0006.jpg",
+      "detected": true,
+      "score": 0.4954110085964203,
+      "box": {
+        "x": 73.17270338535309,
+        "y": 51.92895233631134,
+        "w": 99.28080439567566,
+        "h": 130.03958761692047
+      }
+    },
+    {
+      "path": "lfw_images/Alvaro_Uribe/Alvaro_Uribe_0014.jpg",
+      "detected": false
+    },
+    {
+      "path": "lfw_images/Ashley_Judd/Ashley_Judd_0001.jpg",
+      "detected": false
+    },
+    {
+      "path": "lfw_images/Lubomir_Zaoralek/Lubomir_Zaoralek_0001.jpg",
+      "detected": false
+    },
+    {
+      "path": "lfw_images/Delphine_Chuillot/Delphine_Chuillot_0001.jpg",
+      "detected": false
+    },
+    {
+      "path": "lfw_images/Tracy_Wyle/Tracy_Wyle_0001.jpg",
+      "detected": false
+    },
+    {
+      "path": "lfw_images/Tonga/Tonga_0001.jpg",
+      "detected": false
+    },
+    {
+      "path": "lfw_images/Tom_Scully/Tom_Scully_0001.jpg",
+      "detected": true,
+      "score": 0.489052951335907,
+      "box": {
+        "x": 78.70665192604065,
+        "y": 74.97541606426239,
+        "w": 102.83932089805603,
+        "h": 111.46888136863708
+      }
+    },
+    {
+      "path": "lfw_images/Tom_Hanusik/Tom_Hanusik_0001.jpg",
+      "detected": false
+    },
+    {
+      "path": "lfw_images/Jim_Wong/Jim_Wong_0001.jpg",
+      "detected": true,
+      "score": 0.3213065564632416,
+      "box": {
+        "x": 63.356414437294006,
+        "y": 63.384659588336945,
+        "w": 119.40723657608032,
+        "h": 133.20054858922958
+      }
+    },
+    {
+      "path": "lfw_images/Eddy_Hartenstein/Eddy_Hartenstein_0001.jpg",
+      "detected": false
+    },
+    {
+      "path": "lfw_images/Edward_Greenspan/Edward_Greenspan_0001.jpg",
+      "detected": false
+    },
+    {
+      "path": "lfw_images/Rob_Moore/Rob_Moore_0001.jpg",
+      "detected": false
+    },
+    {
+      "path": "lfw_images/Gabriel_Jorge_Ferreia/Gabriel_Jorge_Ferreia_0001.jpg",
+      "detected": true,
+      "score": 0.4475647807121277,
+      "box": {
+        "x": 201.44571363925934,
+        "y": 70.39067149162292,
+        "w": 48.55428636074066,
+        "h": 115.63333868980408
+      }
+    },
+    {
+      "path": "lfw_images/Hector_Grullon/Hector_Grullon_0001.jpg",
+      "detected": false
+    },
+    {
+      "path": "lfw_images/Koichi_Haraguchi/Koichi_Haraguchi_0001.jpg",
+      "detected": true,
+      "score": 0.307983934879303,
+      "box": {
+        "x": 69.5548728108406,
+        "y": 88.3428305387497,
+        "w": 83.9131698012352,
+        "h": 90.63863754272461
+      }
+    },
+    {
+      "path": "lfw_images/Mayumi_Moriyama/Mayumi_Moriyama_0001.jpg",
+      "detected": true,
+      "score": 0.4883708953857422,
+      "box": {
+        "x": 85.80178022384644,
+        "y": 55.74125796556473,
+        "w": 100.56504607200623,
+        "h": 140.13197273015976
+      }
+    },
+    {
+      "path": "lfw_images/Junichi_Inamoto/Junichi_Inamoto_0001.jpg",
+      "detected": true,
+      "score": 0.38844946026802063,
+      "box": {
+        "x": 1.8741823732852936,
+        "y": 98.6327975988388,
+        "w": 70.7426480948925,
+        "h": 140.94769954681396
+      }
+    },
+    {
+      "path": "lfw_images/Tatiana_Shchegoleva/Tatiana_Shchegoleva_0001.jpg",
+      "detected": false
+    },
+    {
+      "path": "lfw_images/Luis_Rosario_Huertas/Luis_Rosario_Huertas_0001.jpg",
+      "detected": true,
+      "score": 0.44570812582969666,
+      "box": {
+        "x": 54.46302145719528,
+        "y": 59.509217739105225,
+        "w": 106.15388303995132,
+        "h": 129.84834611415863
+      }
+    },
+    {
+      "path": "lfw_images/Mikhail_Khodorkovsky/Mikhail_Khodorkovsky_0001.jpg",
+      "detected": false
+    },
+    {
+      "path": "lfw_images/Penelope_Taylor/Penelope_Taylor_0001.jpg",
+      "detected": false
+    },
+    {
+      "path": "lfw_images/Peter_Caruana/Peter_Caruana_0001.jpg",
+      "detected": true,
+      "score": 0.4988410770893097,
+      "box": {
+        "x": 78.21118831634521,
+        "y": 76.483815908432,
+        "w": 89.21012282371521,
+        "h": 100.11172294616699
+      }
+    },
+    {
+      "path": "lfw_images/Phillips_Idowu/Phillips_Idowu_0001.jpg",
+      "detected": true,
+      "score": 0.4265700876712799,
+      "box": {
+        "x": 54.861221462488174,
+        "y": 69.34366375207901,
+        "w": 113.45438286662102,
+        "h": 119.01631206274033
+      }
+    },
+    {
+      "path": "lfw_images/Vagit_Alekperov/Vagit_Alekperov_0001.jpg",
+      "detected": false
+    },
+    {
+      "path": "lfw_images/Alejandro_Avila/Alejandro_Avila_0003.jpg",
+      "detected": true,
+      "score": 0.4826759099960327,
+      "box": {
+        "x": 84.35454964637756,
+        "y": 71.16496562957764,
+        "w": 108.47193002700806,
+        "h": 115.38872122764587
+      }
+    },
+    {
+      "path": "lfw_images/Arminio_Fraga/Arminio_Fraga_0002.jpg",
+      "detected": false
+    },
+    {
+      "path": "lfw_images/Bill_Clinton/Bill_Clinton_0002.jpg",
+      "detected": true,
+      "score": 0.34889721870422363,
+      "box": {
+        "x": 64.19287621974945,
+        "y": 47.20739275217056,
+        "w": 113.34475874900818,
+        "h": 160.63769906759262
+      }
+    },
+    {
+      "path": "lfw_images/Bill_Clinton/Bill_Clinton_0006.jpg",
+      "detected": false
+    },
+    {
+      "path": "lfw_images/Bill_Clinton/Bill_Clinton_0008.jpg",
+      "detected": false
+    },
+    {
+      "path": "lfw_images/Bill_Clinton/Bill_Clinton_0009.jpg",
+      "detected": true,
+      "score": 0.40707939863204956,
+      "box": {
+        "x": 37.498947232961655,
+        "y": 35.425301641225815,
+        "w": 73.25972989201546,
+        "h": 115.3254546225071
+      }
+    },
+    {
+      "path": "lfw_images/Bill_Clinton/Bill_Clinton_0012.jpg",
+      "detected": false
+    },
+    {
+      "path": "lfw_images/Bill_Clinton/Bill_Clinton_0018.jpg",
+      "detected": false
+    },
+    {
+      "path": "lfw_images/Cecilia_Bolocco/Cecilia_Bolocco_0002.jpg",
+      "detected": true,
+      "score": 0.4397848844528198,
+      "box": {
+        "x": 63.57784569263458,
+        "y": 66.4483904838562,
+        "w": 104.79539632797241,
+        "h": 115.77768623828888
+      }
+    },
+    {
+      "path": "lfw_images/Cecilia_Bolocco/Cecilia_Bolocco_0003.jpg",
+      "detected": true,
+      "score": 0.4194256663322449,
+      "box": {
+        "x": 71.43888622522354,
+        "y": 55.728793144226074,
+        "w": 91.93708747625351,
+        "h": 146.0915505886078
+      }
+    },
+    {
+      "path": "lfw_images/Christian_Wulff/Christian_Wulff_0001.jpg",
+      "detected": false
+    },
+    {
+      "path": "lfw_images/Dave_Campo/Dave_Campo_0001.jpg",
+      "detected": true,
+      "score": 0.3873339295387268,
+      "box": {
+        "x": 66.71617180109024,
+        "y": 72.19395041465759,
+        "w": 102.15332359075546,
+        "h": 110.21304130554199
+      }
+    },
+    {
+      "path": "lfw_images/David_Spade/David_Spade_0001.jpg",
+      "detected": false
+    },
+    {
+      "path": "lfw_images/David_Wells/David_Wells_0007.jpg",
+      "detected": true,
+      "score": 0.45208919048309326,
+      "box": {
+        "x": 36.30102425813675,
+        "y": 66.14050269126892,
+        "w": 148.77023547887802,
+        "h": 161.82270646095276
+      }
+    },
+    {
+      "path": "lfw_images/Duane_Lee_Chapman/Duane_Lee_Chapman_0002.jpg",
+      "detected": false
+    },
+    {
+      "path": "lfw_images/Ed_Smart/Ed_Smart_0003.jpg",
+      "detected": false
+    },
+    {
+      "path": "lfw_images/Eileen_Coparropa/Eileen_Coparropa_0003.jpg",
+      "detected": true,
+      "score": 0.3277168273925781,
+      "box": {
+        "x": 89.86307680606842,
+        "y": 56.191325187683105,
+        "w": 113.7194037437439,
+        "h": 145.2728509902954
+      }
+    },
+    {
+      "path": "lfw_images/Gary_Winnick/Gary_Winnick_0002.jpg",
+      "detected": false
+    },
+    {
+      "path": "lfw_images/Geno_Auriemma/Geno_Auriemma_0001.jpg",
+      "detected": true,
+      "score": 0.4733922779560089,
+      "box": {
+        "x": 24.82105791568756,
+        "y": 29.61835265159607,
+        "w": 203.57683300971985,
+        "h": 219.28492188453674
+      }
+    },
+    {
+      "path": "lfw_images/George_Karl/George_Karl_0002.jpg",
+      "detected": true,
+      "score": 0.3052885830402374,
+      "box": {
+        "x": 75.84404945373535,
+        "y": 74.79289919137955,
+        "w": 121.97986245155334,
+        "h": 117.84421652555466
+      }
+    },
+    {
+      "path": "lfw_images/George_Robertson/George_Robertson_0019.jpg",
+      "detected": false
+    },
+    {
+      "path": "lfw_images/George_Ryan/George_Ryan_0004.jpg",
+      "detected": true,
+      "score": 0.4478679895401001,
+      "box": {
+        "x": 63.47706913948059,
+        "y": 59.97954681515694,
+        "w": 106.48521780967712,
+        "h": 121.40519544482231
+      }
+    },
+    {
+      "path": "lfw_images/Heather_Mills/Heather_Mills_0004.jpg",
+      "detected": true,
+      "score": 0.32114270329475403,
+      "box": {
+        "x": 63.619427382946014,
+        "y": 52.10421979427338,
+        "w": 115.62974005937576,
+        "h": 149.55246448516846
+      }
+    },
+    {
+      "path": "lfw_images/Jake_Gyllenhaal/Jake_Gyllenhaal_0004.jpg",
+      "detected": true,
+      "score": 0.3415481150150299,
+      "box": {
+        "x": 48.645198345184326,
+        "y": 64.748615026474,
+        "w": 108.05022716522217,
+        "h": 122.85342812538147
+      }
+    },
+    {
+      "path": "lfw_images/Jennifer_Lopez/Jennifer_Lopez_0001.jpg",
+      "detected": false
+    },
+    {
+      "path": "lfw_images/Jesse_Jackson/Jesse_Jackson_0005.jpg",
+      "detected": true,
+      "score": 0.4442136287689209,
+      "box": {
+        "x": 63.1677508354187,
+        "y": 59.594251215457916,
+        "w": 97.51836955547333,
+        "h": 117.78431385755539
+      }
+    },
+    {
+      "path": "lfw_images/Joe_Dumars/Joe_Dumars_0001.jpg",
+      "detected": true,
+      "score": 0.42878270149230957,
+      "box": {
+        "x": 68.3131068944931,
+        "y": 65.78036397695541,
+        "w": 109.02492702007294,
+        "h": 129.3235793709755
+      }
+    },
+    {
+      "path": "lfw_images/John_Ashcroft/John_Ashcroft_0043.jpg",
+      "detected": false
+    },
+    {
+      "path": "lfw_images/John_Bolton/John_Bolton_0016.jpg",
+      "detected": false
+    },
+    {
+      "path": "lfw_images/Kobe_Bryant/Kobe_Bryant_0001.jpg",
+      "detected": false
+    },
+    {
+      "path": "lfw_images/Maria_Shriver/Maria_Shriver_0007.jpg",
+      "detected": false
+    },
+    {
+      "path": "lfw_images/Maria_Shriver/Maria_Shriver_0008.jpg",
+      "detected": false
+    },
+    {
+      "path": "lfw_images/Maria_Shriver/Maria_Shriver_0006.jpg",
+      "detected": false
+    },
+    {
+      "path": "lfw_images/Martin_Scorsese/Martin_Scorsese_0003.jpg",
+      "detected": true,
+      "score": 0.3699091076850891,
+      "box": {
+        "x": 63.6046901345253,
+        "y": 45.57003825902939,
+        "w": 97.47197479009628,
+        "h": 147.63394743204117
+      }
+    },
+    {
+      "path": "lfw_images/Michael_Bloomberg/Michael_Bloomberg_0005.jpg",
+      "detected": false
+    },
+    {
+      "path": "lfw_images/Michael_Chang/Michael_Chang_0003.jpg",
+      "detected": true,
+      "score": 0.4805358946323395,
+      "box": {
+        "x": 66.88487529754639,
+        "y": 60.20006537437439,
+        "w": 97.73494303226471,
+        "h": 130.29739260673523
+      }
+    },
+    {
+      "path": "lfw_images/Michael_Jackson/Michael_Jackson_0002.jpg",
+      "detected": false
+    },
+    {
+      "path": "lfw_images/Michael_Jackson/Michael_Jackson_0003.jpg",
+      "detected": false
+    },
+    {
+      "path": "lfw_images/Orlando_Bloom/Orlando_Bloom_0002.jpg",
+      "detected": false
+    },
+    {
+      "path": "lfw_images/Paul_Martin/Paul_Martin_0001.jpg",
+      "detected": false
+    },
+    {
+      "path": "lfw_images/Paul_ONeill/Paul_ONeill_0003.jpg",
+      "detected": false
+    },
+    {
+      "path": "lfw_images/Pierce_Brosnan/Pierce_Brosnan_0005.jpg",
+      "detected": true,
+      "score": 0.3803359568119049,
+      "box": {
+        "x": 70.32701373100281,
+        "y": 60.12221798300743,
+        "w": 106.68511688709259,
+        "h": 120.49289420247078
+      }
+    },
+    {
+      "path": "lfw_images/Rupert_Grint/Rupert_Grint_0001.jpg",
+      "detected": false
+    },
+    {
+      "path": "lfw_images/Sepp_Blatter/Sepp_Blatter_0002.jpg",
+      "detected": false
+    },
+    {
+      "path": "lfw_images/Slobodan_Milosevic/Slobodan_Milosevic_0004.jpg",
+      "detected": true,
+      "score": 0.416389137506485,
+      "box": {
+        "x": 90.56361019611359,
+        "y": 61.62736564874649,
+        "w": 115.09668827056885,
+        "h": 127.15902179479599
+      }
+    },
+    {
+      "path": "lfw_images/Stephen_Friedman/Stephen_Friedman_0001.jpg",
+      "detected": true,
+      "score": 0.43300896883010864,
+      "box": {
+        "x": 24.554289877414703,
+        "y": 15.711218118667603,
+        "w": 149.05648678541183,
+        "h": 190.471351146698
+      }
+    },
+    {
+      "path": "lfw_images/Stephen_Friedman/Stephen_Friedman_0002.jpg",
+      "detected": false
+    },
+    {
+      "path": "lfw_images/Zhu_Rongji/Zhu_Rongji_0008.jpg",
+      "detected": false
+    },
+    {
+      "path": "lfw_images/Marlon_Devonish/Marlon_Devonish_0001.jpg",
+      "detected": false
+    },
+    {
+      "path": "lfw_images/Richard_Regenhard/Richard_Regenhard_0001.jpg",
+      "detected": false
+    },
+    {
+      "path": "lfw_images/Alan_Greer/Alan_Greer_0001.jpg",
+      "detected": false
+    },
+    {
+      "path": "lfw_images/Alecos_Markides/Alecos_Markides_0001.jpg",
+      "detected": true,
+      "score": 0.3044113516807556,
+      "box": {
+        "x": 59.64568257331848,
+        "y": 28.998784720897675,
+        "w": 136.1716389656067,
+        "h": 156.4330831170082
+      }
+    },
+    {
+      "path": "lfw_images/Darryl_Stingley/Darryl_Stingley_0001.jpg",
+      "detected": false
+    },
+    {
+      "path": "lfw_images/Alek_Wek/Alek_Wek_0001.jpg",
+      "detected": false
+    },
+    {
+      "path": "lfw_images/Anzori_Kikalishvili/Anzori_Kikalishvili_0001.jpg",
+      "detected": true,
+      "score": 0.4151359498500824,
+      "box": {
+        "x": 82.46299624443054,
+        "y": 58.58840048313141,
+        "w": 114.8507297039032,
+        "h": 142.3603892326355
+      }
+    },
+    {
+      "path": "lfw_images/Barry_Nakell/Barry_Nakell_0001.jpg",
+      "detected": false
+    },
+    {
+      "path": "lfw_images/Jim_Wessling/Jim_Wessling_0001.jpg",
+      "detected": false
+    },
+    {
+      "path": "lfw_images/Binyamin_Ben-Eliezer/Binyamin_Ben-Eliezer_0001.jpg",
+      "detected": true,
+      "score": 0.3137843608856201,
+      "box": {
+        "x": 29.856055974960327,
+        "y": 29.43941205739975,
+        "w": 143.18321645259857,
+        "h": 180.50292879343033
+      }
+    },
+    {
+      "path": "lfw_images/Jenny_Romero/Jenny_Romero_0001.jpg",
+      "detected": true,
+      "score": 0.48917192220687866,
+      "box": {
+        "x": 87.94331550598145,
+        "y": 68.42923909425735,
+        "w": 91.01930260658264,
+        "h": 110.98562926054001
+      }
+    },
+    {
+      "path": "lfw_images/Carroll_Weimer/Carroll_Weimer_0001.jpg",
+      "detected": false
+    },
+    {
+      "path": "lfw_images/Clifford_Robinson/Clifford_Robinson_0001.jpg",
+      "detected": false
+    },
+    {
+      "path": "lfw_images/Curtis_Strange/Curtis_Strange_0001.jpg",
+      "detected": false
+    },
+    {
+      "path": "lfw_images/Freda_Black/Freda_Black_0001.jpg",
+      "detected": false
+    },
+    {
+      "path": "lfw_images/Dave_Campo/Dave_Campo_0002.jpg",
+      "detected": false
+    },
+    {
+      "path": "lfw_images/Francois_Botha/Francois_Botha_0001.jpg",
+      "detected": false
+    },
+    {
+      "path": "lfw_images/George_Robertson/George_Robertson_0005.jpg",
+      "detected": true,
+      "score": 0.37307265400886536,
+      "box": {
+        "x": 51.04610696434975,
+        "y": 45.55906355381012,
+        "w": 117.21306666731834,
+        "h": 168.2870388031006
+      }
+    },
+    {
+      "path": "lfw_images/Marcos_Milinkovic/Marcos_Milinkovic_0001.jpg",
+      "detected": true,
+      "score": 0.35201671719551086,
+      "box": {
+        "x": 55.1808662712574,
+        "y": 61.837829649448395,
+        "w": 113.92712220549583,
+        "h": 146.96427434682846
+      }
+    },
+    {
+      "path": "lfw_images/Haydar_Aliyev/Haydar_Aliyev_0001.jpg",
+      "detected": true,
+      "score": 0.3538067936897278,
+      "box": {
+        "x": 78.35149765014648,
+        "y": 60.81755459308624,
+        "w": 87.88135647773743,
+        "h": 128.75676155090332
+      }
+    },
+    {
+      "path": "lfw_images/Heather_Willson/Heather_Willson_0001.jpg",
+      "detected": true,
+      "score": 0.4205477237701416,
+      "box": {
+        "x": 67.81330704689026,
+        "y": 64.28052484989166,
+        "w": 100.59821605682373,
+        "h": 121.15815281867981
+      }
+    },
+    {
+      "path": "lfw_images/Kim_Yun-kyu/Kim_Yun-kyu_0001.jpg",
+      "detected": false
+    },
+    {
+      "path": "lfw_images/Mark_Andrew/Mark_Andrew_0001.jpg",
+      "detected": false
+    },
+    {
+      "path": "lfw_images/Michael_J_Fox/Michael_J_Fox_0001.jpg",
+      "detected": true,
+      "score": 0.4360881447792053,
+      "box": {
+        "x": 47.01914265751839,
+        "y": 69.36764717102051,
+        "w": 123.74892458319664,
+        "h": 123.36969375610352
+      }
+    },
+    {
+      "path": "lfw_images/Ontario_Lett/Ontario_Lett_0001.jpg",
+      "detected": false
+    }
+  ]
+}

@@ -1,0 +1,38 @@
+{
+  "library": "face-api.js",
+  "version": "0.22.2",
+  "model": "ssdMobilenetv1",
+  "inputSize": "default (model native)",
+  "thresholds": {
+    "0.1": {
+      "detected": 504,
+      "errors": 0,
+      "total": 619,
+      "rate": 0.81421647819063
+    },
+    "0.2": {
+      "detected": 365,
+      "errors": 0,
+      "total": 619,
+      "rate": 0.5896607431340872
+    },
+    "0.3": {
+      "detected": 250,
+      "errors": 0,
+      "total": 619,
+      "rate": 0.40387722132471726
+    },
+    "0.4": {
+      "detected": 130,
+      "errors": 0,
+      "total": 619,
+      "rate": 0.210016155088853
+    },
+    "0.5": {
+      "detected": 0,
+      "errors": 0,
+      "total": 619,
+      "rate": 0
+    }
+  }
+}

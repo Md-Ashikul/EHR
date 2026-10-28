@@ -12,6 +12,7 @@
   "type": "commonjs",
   "dependencies": {
     "@nomicfoundation/hardhat-toolbox": "^5.0.0",
+    "@tensorflow/tfjs-node": "^1.7.0",
     "canvas": "^3.2.3",
     "ethers": "^6.15.0",
     "face-api.js": "^0.22.2",
