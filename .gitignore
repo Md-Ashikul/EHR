@@ -23,6 +23,6 @@ keyvault.json
 /biometric_evaluation/cache/
 
 # Generated evaluation results and figures
-/biometric_evaluation/results/
-/biometric_evaluation/plots/
-/biometric_evaluation/report/
+#/biometric_evaluation/results/
+#/biometric_evaluation/plots/
+#/biometric_evaluation/report/
