@@ -1,0 +1,15 @@
+{
+  "python": "3.12.4 (tags/v3.12.4:8e8a4ba, Jun  6 2024, 19:30:16) [MSC v.1940 64 bit (AMD64)]",
+  "numpy": "2.1.2",
+  "pandas": "2.2.3",
+  "seed": 42,
+  "git_commit": "c62e796c706050c8d3a2a602e319cbc173e0d702",
+  "input_sha256": {
+    "pairs.csv": "7f540157be42f57ab5bb1d7ef53b7b379e0331b4842cbd32f4d1b625243e54fe",
+    "results/biometric_pairs.csv": "37db12657b6f911fe698b94013a5da26d17873e4f3cb8c59602cd5212290783e",
+    "results/biometric_thresholds.csv": "104da863d4c77e8024ce45fb6da165cf065996d7c239eb602a2e2b61454b83d7",
+    "results/fold_results.csv": "3a3d4f8559d4e3b75e3723d4ad098d5de771e35d0697c2d8ffdbd5876bb958a8",
+    "results/biometric_summary.csv": "23bb7a43ddf6ae0110a059c651238c1264cacb3eb747661138fa872f793f2818",
+    "results/run_info.json": "659ffddfbd5cfa94ae5a2a56b8caf62d46101970f7b85ae0be3f2f12709eafad"
+  }
+}

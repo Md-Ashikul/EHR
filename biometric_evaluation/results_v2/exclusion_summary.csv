@@ -1,0 +1,12 @@
+metric,value
+distinct_images_total,7701.0
+failed_images,619.0
+failure_to_acquire_rate,0.08037917153616414
+excluded_pairs_total,895.0
+excluded_genuine,422.0
+excluded_impostor,473.0
+genuine_exclusion_rate,0.14066666666666666
+impostor_exclusion_rate,0.15766666666666668
+one_failed_image_pairs,831.0
+both_failed_image_pairs,64.0
+identities_all_images_failed,250.0
