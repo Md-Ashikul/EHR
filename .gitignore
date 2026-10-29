@@ -26,3 +26,4 @@ keyvault.json
 #/biometric_evaluation/results/
 #/biometric_evaluation/plots/
 #/biometric_evaluation/report/
+__pycache__/
