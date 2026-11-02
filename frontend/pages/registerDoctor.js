@@ -11,6 +11,12 @@ const CHALLENGES = [
 ];
 
 const dist = (p1, p2) => Math.hypot(p1.x - p2.x, p1.y - p2.y);
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+const nextFrame = () => new Promise((r) => requestAnimationFrame(() => r()));
+
+const DETECT_WIDTH = 480;
+const LUMA_SAMPLE = 24;
+const MIN_FACE_LUMA = 80;
 
 function computeClientMetrics(landmarks, expressions) {
   const pts = landmarks.positions;
@@ -58,10 +64,26 @@ export default function RegisterDoctor() {
 
   // Refs for real-time loop
   const webcamRef = useRef(null);
-  const isServerBusyRef = useRef(false);
   const completedTokenRef = useRef(null);
   const challengeIdxRef = useRef(0);
-  const baselineEarRef = useRef(0.30);
+
+  // Camera selection (lets you pick DroidCam / external webcams) + face brightness meter
+  const [cameras, setCameras] = useState([]);
+  const [cameraId, setCameraId] = useState("");
+  const [faceLuma, setFaceLuma] = useState(null);
+
+  const handleUserMedia = async () => {
+    try {
+      const devices = await navigator.mediaDevices.enumerateDevices();
+      setCameras(devices.filter((d) => d.kind === "videoinput"));
+    } catch (e) {
+      console.error("Camera enumeration failed:", e);
+    }
+  };
+
+  const videoConstraints = cameraId
+    ? { deviceId: { exact: cameraId }, width: { ideal: 1280 }, height: { ideal: 720 } }
+    : { facingMode: "user", width: { ideal: 1280 }, height: { ideal: 720 } };
 
   // 1. LOAD AI MODELS IN BROWSER
   useEffect(() => {
@@ -125,47 +147,78 @@ export default function RegisterDoctor() {
     let cancelled = false;
 
     const runDetectionLoop = async () => {
-      while (!cancelled && step === 2 && !isLive) {
+      // rawCanvas = untouched pixels (sent to server for PAD — MiniFASNet must see real sensor texture).
+      // detectCanvas = downscaled + contrast-boosted copy used ONLY for fast client-side landmark tracking.
+      const rawCanvas = document.createElement("canvas");
+      const rawCtx = rawCanvas.getContext("2d");
+      const detectCanvas = document.createElement("canvas");
+      const detectCtx = detectCanvas.getContext("2d");
+      const blinkCanvas = document.createElement("canvas");
+      const blinkCtx = blinkCanvas.getContext("2d");
+      const lumaCanvas = document.createElement("canvas");
+      lumaCanvas.width = LUMA_SAMPLE;
+      lumaCanvas.height = LUMA_SAMPLE;
+      const lumaCtx = lumaCanvas.getContext("2d", { willReadFrequently: true });
+
+      // Client detection is only a trigger hint; the server re-detects at the strict 0.50 confidence.
+      const trackerOptions = new faceapi.SsdMobilenetv1Options({ minConfidence: 0.3 });
+
+      let baselineEar = null;
+      let blinkDip = null;
+      let frameCount = 0;
+
+      while (!cancelled) {
         const video = webcamRef.current?.video;
-        if (!video || video.readyState !== 4 || isServerBusyRef.current) {
-          await new Promise((r) => setTimeout(r, 150));
+        if (!video || video.readyState < 2 || !video.videoWidth) {
+          await sleep(100);
           continue;
         }
 
-        isServerBusyRef.current = true;
         try {
-          const canvas = document.createElement("canvas");
-          canvas.width = video.videoWidth || 640;
-          canvas.height = video.videoHeight || 480;
-          const ctx = canvas.getContext("2d");
+          const vw = video.videoWidth;
+          const vh = video.videoHeight;
+          const scale = Math.min(1, DETECT_WIDTH / vw);
+          const dw = Math.round(vw * scale);
+          const dh = Math.round(vh * scale);
+          if (rawCanvas.width !== vw || rawCanvas.height !== vh) {
+            rawCanvas.width = blinkCanvas.width = vw;
+            rawCanvas.height = blinkCanvas.height = vh;
+            detectCanvas.width = dw;
+            detectCanvas.height = dh;
+          }
 
-          // Fix B: Normalize dim indoor webcam lighting before running SSD MobileNetV1 (0.50 default threshold)
-          ctx.filter = "contrast(1.25) brightness(1.15)";
-          ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-          ctx.filter = "none";
+          rawCtx.drawImage(video, 0, 0, vw, vh);
+          detectCtx.filter = "contrast(1.25) brightness(1.2)";
+          detectCtx.drawImage(rawCanvas, 0, 0, dw, dh);
+          detectCtx.filter = "none";
 
-          const detection = await faceapi
-            .detectSingleFace(canvas)
-            .withFaceLandmarks()
-            .withFaceExpressions();
+          const currentIdx = challengeIdxRef.current;
+          const currentChallenge = CHALLENGES[currentIdx];
+          if (!currentChallenge) break;
+
+          // Expressions net is only needed for the smile step — skipping it roughly halves frame time.
+          const baseTask = faceapi.detectSingleFace(detectCanvas, trackerOptions).withFaceLandmarks();
+          const detection =
+            currentChallenge.id === "smile" ? await baseTask.withFaceExpressions() : await baseTask;
+
+          if (cancelled) break;
 
           if (!detection) {
             setLiveTelemetry("No face detected — sit slightly back so your whole head is visible");
-            isServerBusyRef.current = false;
-            await new Promise((r) => setTimeout(r, 150));
+            await nextFrame();
             continue;
           }
 
+          frameCount++;
           const metrics = computeClientMetrics(detection.landmarks, detection.expressions);
-          const currentIdx = challengeIdxRef.current;
-          const currentChallenge = CHALLENGES[currentIdx];
-          if (!currentChallenge) {
-            isServerBusyRef.current = false;
-            break;
-          }
 
-          if (metrics.ear > 0.26) {
-            baselineEarRef.current = baselineEarRef.current * 0.8 + metrics.ear * 0.2;
+          if (frameCount % 10 === 1) {
+            const b = detection.detection.box;
+            lumaCtx.drawImage(rawCanvas, b.x / scale, b.y / scale, b.width / scale, b.height / scale, 0, 0, LUMA_SAMPLE, LUMA_SAMPLE);
+            const px = lumaCtx.getImageData(0, 0, LUMA_SAMPLE, LUMA_SAMPLE).data;
+            let sum = 0;
+            for (let i = 0; i < px.length; i += 4) sum += 0.299 * px[i] + 0.587 * px[i + 1] + 0.114 * px[i + 2];
+            setFaceLuma(Math.round(sum / (px.length / 4)));
           }
 
           const scorePct = Math.round(detection.detection.score * 100);
@@ -175,6 +228,7 @@ export default function RegisterDoctor() {
               scorePct +
               "%) | EAR: " +
               metrics.ear.toFixed(2) +
+              (baselineEar ? " (open≈" + baselineEar.toFixed(2) + ")" : "") +
               " | Yaw: " +
               metrics.yaw.toFixed(2) +
               " | Smile: " +
@@ -182,25 +236,48 @@ export default function RegisterDoctor() {
               "%"
           );
 
-          let triggered = false;
+          let sendCanvas = null;
           if (currentChallenge.id === "blink") {
-            triggered = metrics.ear < 0.265 || metrics.ear < baselineEarRef.current * 0.86;
+            // A blink lasts ~100-300ms, so treat it as an event: open → closed (keep the most-closed
+            // raw frame) → reopened. Only a genuine transition gets sent to the server.
+            if (baselineEar === null) baselineEar = metrics.ear;
+            const closedThreshold = Math.min(0.26, baselineEar * 0.8);
+
+            if (!blinkDip) {
+              if (metrics.ear < closedThreshold) {
+                blinkDip = { minEar: metrics.ear, frames: 1 };
+                blinkCtx.drawImage(rawCanvas, 0, 0);
+              } else {
+                baselineEar = baselineEar * 0.9 + metrics.ear * 0.1;
+              }
+            } else {
+              blinkDip.frames++;
+              if (metrics.ear < blinkDip.minEar) {
+                blinkDip.minEar = metrics.ear;
+                blinkCtx.drawImage(rawCanvas, 0, 0);
+              }
+              const reopened = metrics.ear > baselineEar * 0.9;
+              if (reopened || blinkDip.frames >= 6) {
+                console.log("[v0] Blink captured, min EAR:", blinkDip.minEar.toFixed(3), "baseline:", baselineEar.toFixed(3));
+                sendCanvas = blinkCanvas;
+                blinkDip = null;
+              }
+            }
           } else if (currentChallenge.id === "left") {
-            triggered = metrics.yaw > 1.35; // Turn toward YOUR LEFT shoulder
+            if (metrics.yaw > 1.35) sendCanvas = rawCanvas; // Turn toward YOUR LEFT shoulder
           } else if (currentChallenge.id === "right") {
-            triggered = metrics.yaw < 0.74; // Turn toward YOUR RIGHT shoulder
+            if (metrics.yaw < 0.74) sendCanvas = rawCanvas; // Turn toward YOUR RIGHT shoulder
           } else if (currentChallenge.id === "smile") {
-            triggered = metrics.happy > 0.60 || metrics.smile > 0.42;
+            if (metrics.happy > 0.6 || metrics.smile > 0.42) sendCanvas = rawCanvas;
           }
 
-          if (!triggered) {
-            isServerBusyRef.current = false;
-            await new Promise((r) => setTimeout(r, 120));
+          if (!sendCanvas) {
+            await nextFrame();
             continue;
           }
 
           setBottomStatus("Verifying " + currentChallenge.id.toUpperCase() + " & Anti-Spoofing on server...");
-          const frameBase64 = canvas.toDataURL("image/jpeg", 0.90);
+          const frameBase64 = sendCanvas.toDataURL("image/jpeg", 0.92);
 
           const res = await fetch("/api/checkLiveness", {
             method: "POST",
@@ -209,28 +286,25 @@ export default function RegisterDoctor() {
               frame: frameBase64,
               challenge: currentChallenge.id,
               completedToken: completedTokenRef.current,
-              clientMetrics: metrics,
             }),
           });
 
           const data = await res.json();
+          if (cancelled) break;
 
           if (!res.ok) {
             setSpoofWarning(data.reason || "Server error during liveness check");
-            isServerBusyRef.current = false;
-            await new Promise((r) => setTimeout(r, 300));
+            await sleep(300);
             continue;
           }
 
           if (data.pad && !data.pad.isReal) {
-            const padRealPct = Math.round(data.pad.realScore * 100);
-            setSpoofWarning("⚠️ Spoof / Screen Detected! (Real score: " + padRealPct + "%)");
+            setSpoofWarning("⚠️ " + data.reason);
             setBottomStatus(currentChallenge.statusText);
-            isServerBusyRef.current = false;
-            await new Promise((r) => setTimeout(r, 300));
+            await sleep(300);
             continue;
           } else {
-            setSpoofWarning("");
+            setSpoofWarning(data.live ? "" : data.reason && data.reason !== "ok" ? data.reason : "");
           }
 
           if (data.live) {
@@ -256,11 +330,10 @@ export default function RegisterDoctor() {
           }
         } catch (err) {
           console.error("[Liveness Loop Error]:", err);
-        } finally {
-          isServerBusyRef.current = false;
+          await sleep(300);
         }
 
-        await new Promise((r) => setTimeout(r, 150));
+        await nextFrame();
       }
     };
 
@@ -432,14 +505,43 @@ export default function RegisterDoctor() {
                   </div>
                 )}
 
+                {cameras.length > 1 && (
+                  <div className="w-full mb-3">
+                    <label htmlFor="camera-select" className="block text-xs font-bold text-gray-600 mb-1">
+                      Camera
+                    </label>
+                    <select
+                      id="camera-select"
+                      className="w-full p-2 border rounded text-sm"
+                      value={cameraId}
+                      onChange={(e) => setCameraId(e.target.value)}
+                    >
+                      <option value="">Default camera</option>
+                      {cameras.map((c, i) => (
+                        <option key={c.deviceId} value={c.deviceId}>
+                          {c.label || `Camera ${i + 1}`}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                )}
+
+                {faceLuma !== null && faceLuma < MIN_FACE_LUMA && (
+                  <div className="w-full bg-yellow-100 border border-yellow-400 text-yellow-800 px-3 py-2 rounded mb-3 text-center text-sm">
+                    {"Face too dark (brightness " + faceLuma + "/255). Face a window or lamp, raise screen brightness, or switch to DroidCam."}
+                  </div>
+                )}
+
                 <div className="relative border-4 border-black rounded-lg overflow-hidden mb-3 bg-black">
                   <Webcam
+                    key={cameraId || "default"}
                     audio={false}
                     ref={webcamRef}
                     screenshotFormat="image/jpeg"
                     width={400}
                     height={300}
-                    videoConstraints={{ width: 640, height: 480, facingMode: "user" }}
+                    videoConstraints={videoConstraints}
+                    onUserMedia={handleUserMedia}
                   />
                   {!isLive ? (
                     <div className="absolute top-2 right-2 bg-black bg-opacity-75 text-white px-3 py-1 rounded text-xs">

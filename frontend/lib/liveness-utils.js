@@ -122,6 +122,23 @@ export async function evaluateAntiSpoofing(imageBuffer, faceBox) {
   };
 }
 
+// Contrast-stretched copy used ONLY for face detection/landmarks in dim light.
+// PAD must always run on the original buffer so MiniFASNet sees untouched sensor texture.
+export async function normalizeForDetection(imageBuffer) {
+  return sharp(imageBuffer).normalise().jpeg({ quality: 95 }).toBuffer();
+}
+
+export async function measureFaceBrightness(imageBuffer, faceBox) {
+  const metadata = await sharp(imageBuffer).metadata();
+  const left = Math.max(0, Math.floor(faceBox.x));
+  const top = Math.max(0, Math.floor(faceBox.y));
+  const width = Math.max(1, Math.min(metadata.width - left, Math.floor(faceBox.width)));
+  const height = Math.max(1, Math.min(metadata.height - top, Math.floor(faceBox.height)));
+  const { channels } = await sharp(imageBuffer).extract({ left, top, width, height }).stats();
+  const [r, g, b] = channels;
+  return 0.299 * r.mean + 0.587 * g.mean + 0.114 * b.mean;
+}
+
 const dist = (p1, p2) => Math.hypot(p1.x - p2.x, p1.y - p2.y);
 
 export function calculateEAR(landmarks) {

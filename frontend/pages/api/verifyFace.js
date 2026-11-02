@@ -8,6 +8,7 @@ import {
   setCachedRefDescriptor,
   compareFaces,
 } from '../../lib/face-api-server';
+import { normalizeForDetection } from '../../lib/liveness-utils';
 import path from 'path';
 import crypto from 'crypto';
 import fs from 'fs';
@@ -104,7 +105,8 @@ export default async function handler(req, res) {
     const t_liveStart = performance.now();
     const base64Data = liveImageBase64.replace(/^data:image\/\w+;base64,/, '');
     const liveImageBuffer = Buffer.from(base64Data, 'base64');
-    const liveImage = bufferToImage(liveImageBuffer);
+    // Same preprocessing as /api/checkLiveness so the anchor descriptor and this one are comparable
+    const liveImage = bufferToImage(await normalizeForDetection(liveImageBuffer));
     const liveDetection = await getFaceDescriptor(liveImage);
     const liveComputeTime = (performance.now() - t_liveStart).toFixed(2);
 
