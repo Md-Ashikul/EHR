@@ -2,8 +2,14 @@ import crypto from 'crypto';
 
 export const ALL_CHALLENGES = ['blink', 'left', 'right', 'smile'];
 
-export const SESSION_TTL_MS = 120_000;
-export const STEP_TIMEOUT_MS = 25_000;
+// The clock starts only AFTER the client has achieved face lock and called /api/startLiveness.
+// User-facing time (gestures + 500ms transitions) must fit in GESTURE_WINDOW_MS.
+// Server-side verification time is measured by the server and excluded, so a slow CPU doesn't eat the user's budget.
+export const GESTURE_WINDOW_MS = 10_000;
+// Covers the upload of the last burst captured just before the deadline.
+export const NETWORK_GRACE_MS = 1_000;
+// Absolute wall-clock cap regardless of processing time.
+export const SESSION_HARD_TTL_MS = 60_000;
 export const MAX_FAILURES_PER_STEP = 12;
 export const PROOF_TTL_MS = 60_000;
 export const REGISTRATION_GRANT_TTL_MS = 5 * 60_000;
@@ -42,7 +48,7 @@ const store =
 function prune() {
   const now = Date.now();
   for (const [id, s] of store.sessions) {
-    if (now - s.createdAt > SESSION_TTL_MS + PROOF_TTL_MS) store.sessions.delete(id);
+    if (now - s.createdAt > SESSION_HARD_TTL_MS + PROOF_TTL_MS) store.sessions.delete(id);
   }
   for (const [token, g] of store.registrationGrants) {
     if (now > g.expiresAt) store.registrationGrants.delete(token);
@@ -74,9 +80,14 @@ export function createSession(doctorId) {
 
   const starts = (store.sessionStarts.get(doctorId) || []).filter((t) => now - t < SESSION_RATE_WINDOW_MS);
   if (starts.length >= MAX_SESSIONS_PER_DOCTOR_WINDOW) {
-    return { error: 'Too many liveness attempts for this doctor. Wait 10 minutes and try again.' };
+    const retryAfterMs = SESSION_RATE_WINDOW_MS - (now - starts[0]);
+    return {
+      error: `Too many liveness attempts for this doctor. Try again in ${Math.ceil(retryAfterMs / 60_000)} minute(s).`,
+      retryAfterMs,
+    };
   }
   starts.push(now);
+  const attemptsLeft = MAX_SESSIONS_PER_DOCTOR_WINDOW - starts.length;
   store.sessionStarts.set(doctorId, starts);
 
   // Only one live session per doctor — starting a new one kills older ones.
@@ -91,7 +102,8 @@ export function createSession(doctorId) {
     step: 0,
     completed: [],
     createdAt: now,
-    stepStartedAt: now,
+    processingMs: 0,
+    busy: false,
     stepFailures: 0,
     anchorDescriptor: null,
     finalFrame: null,
@@ -100,7 +112,11 @@ export function createSession(doctorId) {
     passedAt: null,
   };
   store.sessions.set(session.id, session);
-  return { session };
+  return { session, attemptsLeft };
+}
+
+export function userElapsedMs(session, now = Date.now()) {
+  return now - session.createdAt - session.processingMs;
 }
 
 export function getSession(sessionId) {
@@ -111,8 +127,10 @@ export function getSession(sessionId) {
 
 export function sessionTimeError(session) {
   const now = Date.now();
-  if (now - session.createdAt > SESSION_TTL_MS) return 'Liveness session expired. Restarting with new challenges.';
-  if (now - session.stepStartedAt > STEP_TIMEOUT_MS) return 'Challenge timed out. Restarting with new challenges.';
+  if (now - session.createdAt > SESSION_HARD_TTL_MS) return 'Liveness session expired.';
+  if (userElapsedMs(session, now) > GESTURE_WINDOW_MS + NETWORK_GRACE_MS) {
+    return `Time is up — all gestures must be completed within ${GESTURE_WINDOW_MS / 1000} seconds.`;
+  }
   return null;
 }
 

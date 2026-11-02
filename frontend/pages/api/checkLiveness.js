@@ -14,8 +14,9 @@ import {
   failSession,
   issueProof,
   frameHash,
+  userElapsedMs,
   MAX_FAILURES_PER_STEP,
-  STEP_TIMEOUT_MS,
+  GESTURE_WINDOW_MS,
 } from '../../lib/liveness-session';
 
 export const config = {
@@ -115,19 +116,36 @@ function checkFaceContinuity(rule, f) {
 export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
 
+  const { sessionId } = req.body || {};
+  const session = getSession(sessionId);
+  if (!session || session.status !== 'active') {
+    return res.status(200).json({ passed: false, restart: true, reason: 'Liveness session invalid or expired.' });
+  }
+
+  const timeError = sessionTimeError(session);
+  if (timeError) {
+    failSession(session);
+    return res.status(200).json({ passed: false, restart: true, reason: timeError });
+  }
+
+  // One burst at a time per session: prevents step-advance races and stops parallel
+  // requests from inflating processingMs to stretch the time window.
+  if (session.busy) {
+    return res.status(409).json({ passed: false, reason: 'Previous gesture still being verified.' });
+  }
+  session.busy = true;
   const t0 = performance.now();
   try {
-    const { sessionId, challenge, frames } = req.body || {};
-    const session = getSession(sessionId);
-    if (!session || session.status !== 'active') {
-      return res.status(200).json({ passed: false, restart: true, reason: 'Liveness session invalid or expired. Restarting.' });
-    }
+    return await processBurst(req, res, session, t0);
+  } finally {
+    session.busy = false;
+    session.processingMs += performance.now() - t0;
+  }
+}
 
-    const timeError = sessionTimeError(session);
-    if (timeError) {
-      failSession(session);
-      return res.status(200).json({ passed: false, restart: true, reason: timeError });
-    }
+async function processBurst(req, res, session, t0) {
+  try {
+    const { challenge, frames } = req.body || {};
 
     const expected = session.challenges[session.step];
     if (challenge !== expected) {
@@ -216,7 +234,6 @@ export default async function handler(req, res) {
     if (!session.anchorDescriptor) session.anchorDescriptor = analyzed[0].descriptor;
     session.completed.push(challenge);
     session.step += 1;
-    session.stepStartedAt = Date.now();
     session.stepFailures = 0;
 
     const allDone = session.step >= session.challenges.length;
@@ -226,7 +243,10 @@ export default async function handler(req, res) {
       // so the client can't substitute a different image afterwards.
       session.finalFrame = buffers[0];
       proof = issueProof(session);
-      console.log(`[LIVENESS] Doctor=${session.doctorId} PASSED all challenges [${session.completed.join(', ')}]`);
+      console.log(
+        `[LIVENESS] Doctor=${session.doctorId} PASSED all challenges [${session.completed.join(', ')}] | ` +
+          `user time ${(userElapsedMs(session) / 1000).toFixed(1)}s, server time ${((session.processingMs + performance.now() - t0) / 1000).toFixed(1)}s`
+      );
     }
 
     return res.status(200).json({
@@ -234,7 +254,7 @@ export default async function handler(req, res) {
       allDone,
       completed: session.completed,
       nextChallenge: allDone ? null : session.challenges[session.step],
-      stepTimeoutMs: STEP_TIMEOUT_MS,
+      windowMs: GESTURE_WINDOW_MS,
       proof,
       minPad,
       minLuma,

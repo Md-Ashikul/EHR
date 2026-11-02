@@ -1,6 +1,7 @@
 import { readDoctorDB } from '../../lib/db-handler';
-import { createSession, STEP_TIMEOUT_MS, SESSION_TTL_MS } from '../../lib/liveness-session';
+import { createSession, GESTURE_WINDOW_MS } from '../../lib/liveness-session';
 
+// Called by the client ONLY after camera warm-up and a stable face lock — this is where the clock starts.
 export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
 
@@ -16,15 +17,15 @@ export default async function handler(req, res) {
       return res.status(400).json({ error: 'This doctor has already completed registration.' });
     }
 
-    const { session, error } = createSession(id);
-    if (error) return res.status(429).json({ error });
+    const { session, attemptsLeft, error, retryAfterMs } = createSession(id);
+    if (error) return res.status(429).json({ error, retryAfterMs });
 
-    console.log(`[LIVENESS] New session for doctor ${id} | Order=[${session.challenges.join(' -> ')}]`);
+    console.log(`[LIVENESS] New session for doctor ${id} | Order=[${session.challenges.join(' -> ')}] | attemptsLeft=${attemptsLeft}`);
     return res.status(200).json({
       sessionId: session.id,
       challenges: session.challenges,
-      stepTimeoutMs: STEP_TIMEOUT_MS,
-      sessionTtlMs: SESSION_TTL_MS,
+      windowMs: GESTURE_WINDOW_MS,
+      attemptsLeft,
     });
   } catch (e) {
     console.error('[startLiveness]', e);
