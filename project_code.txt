@@ -1,0 +1,3527 @@
+=== FILE: C:\EHR\frontend\lib\crypto\documentEncryption.js ===
+// documentEncryption.js — browser-only document encryption for the EHR scheme (Step 4).
+//
+// Converts plaintext <-> serializable ciphertext pieces. It does NOT touch IPFS or any API.
+//   encryptDocument -> { ipfsPayload, dekEnvelope }
+//     ipfsPayload : uploaded to IPFS (file + metadata, both AES-256-GCM under a fresh DEK)
+//     dekEnvelope : stored via keyvault/putEnvelope (the DEK wrapped under the patient's AK)
+//   decryptDocument -> { fileBytes, metadata }
+//
+// Every ciphertext is bound to `patientAddress.toLowerCase():docId` via AES-GCM AAD, so a
+// payload cannot be replayed against a different patient or document without a tag failure.
+//
+// Browser-only: never import into pages/api/*. Plaintext and raw DEKs exist only in memory here.
+
+import { ready, toB64, fromB64, wrapDEK, unwrapDEK } from "./keyManagement"
+
+export const VERSION = 1
+const ALG = "AES-256-GCM"
+const NONCE_BYTES = 12
+const DEK_BYTES = 32
+
+// Checked at call time rather than import time so Pages Router SSR of a page that imports
+// this module still renders; any actual crypto call on the server throws.
+function assertBrowser() {
+  if (typeof window === "undefined" || !globalThis.crypto?.subtle) {
+    throw new Error("documentEncryption is browser-only and must not run on the server")
+  }
+}
+
+export function generateDEK() {
+  assertBrowser()
+  return crypto.getRandomValues(new Uint8Array(DEK_BYTES))
+}
+
+function buildAAD(patientAddress, docId) {
+  if (typeof patientAddress !== "string" || !patientAddress) throw new Error("patientAddress is required")
+  if (typeof docId !== "string" || !docId) throw new Error("docId is required")
+  return new TextEncoder().encode(`${patientAddress.toLowerCase()}:${docId}`)
+}
+
+function importDEK(dekBytes) {
+  return crypto.subtle.importKey("raw", dekBytes, { name: "AES-GCM" }, false, ["encrypt", "decrypt"])
+}
+
+async function gcmEncrypt(key, plaintext, aad) {
+  const nonce = crypto.getRandomValues(new Uint8Array(NONCE_BYTES))
+  const ct = await crypto.subtle.encrypt({ name: "AES-GCM", iv: nonce, additionalData: aad }, key, plaintext)
+  return { nonce: toB64(nonce), ciphertext: toB64(new Uint8Array(ct)) }
+}
+
+async function gcmDecrypt(key, nonceB64, ciphertextB64, aad) {
+  const pt = await crypto.subtle.decrypt(
+    { name: "AES-GCM", iv: fromB64(nonceB64), additionalData: aad },
+    key,
+    fromB64(ciphertextB64),
+  )
+  return new Uint8Array(pt)
+}
+
+export async function encryptDocument({ fileBytes, metadata, ak, patientAddress, docId, akVersion = 1 }) {
+  assertBrowser()
+  await ready()
+  if (!(fileBytes instanceof Uint8Array)) throw new Error("fileBytes must be a Uint8Array")
+
+  const aad = buildAAD(patientAddress, docId)
+  const dek = generateDEK()
+  try {
+    const key = await importDEK(dek)
+    const file = await gcmEncrypt(key, fileBytes, aad)
+    const meta = await gcmEncrypt(key, new TextEncoder().encode(JSON.stringify(metadata ?? {})), aad)
+    const { wrappedDek, nonce } = await wrapDEK(dek, ak)
+
+    return {
+      ipfsPayload: {
+        v: VERSION,
+        alg: ALG,
+        fileNonce: file.nonce,
+        ciphertext: file.ciphertext,
+        metaNonce: meta.nonce,
+        encMeta: meta.ciphertext,
+        docId,
+      },
+      dekEnvelope: { wrappedDek, nonce, akVersion },
+    }
+  } finally {
+    dek.fill(0)
+  }
+}
+
+export async function decryptDocument({ ipfsPayload, dekEnvelope, ak, patientAddress, docId }) {
+  assertBrowser()
+  await ready()
+  if (!ipfsPayload || ipfsPayload.v !== VERSION || ipfsPayload.alg !== ALG) {
+    throw new Error("Unsupported encrypted payload version or algorithm")
+  }
+  if (ipfsPayload.docId !== docId) throw new Error("Payload docId does not match the requested document")
+  if (!dekEnvelope?.wrappedDek || !dekEnvelope?.nonce) throw new Error("DEK envelope is missing or malformed")
+
+  const aad = buildAAD(patientAddress, docId)
+  const dek = await unwrapDEK(dekEnvelope.wrappedDek, dekEnvelope.nonce, ak)
+  try {
+    const key = await importDEK(dek)
+    const metaBytes = await gcmDecrypt(key, ipfsPayload.metaNonce, ipfsPayload.encMeta, aad)
+    const fileBytes = await gcmDecrypt(key, ipfsPayload.fileNonce, ipfsPayload.ciphertext, aad)
+    return { fileBytes, metadata: JSON.parse(new TextDecoder().decode(metaBytes)) }
+  } finally {
+    dek.fill(0)
+  }
+}
+=== FILE: C:\EHR\frontend\lib\crypto\keyManagement.js ===
+// keyManagement.js — browser-only key material for the EHR encryption scheme.
+//
+// This module NEVER runs on the server. It handles:
+//   1. Argon2id passphrase -> X25519 identity keypair derivation (deterministic).
+//   2. Access Key (AK) generation (per-patient symmetric key).
+//   3. Wrapping/unwrapping the AK for a viewer via X25519 sealed boxes (libsodium).
+//   4. Wrapping/unwrapping a document key (DEK) under the AK via AES-256-GCM (Web Crypto).
+//
+// Trust model (Path A): private keys and plaintext keys exist only in browser memory.
+// The server and IPFS only ever receive the outputs of the wrap functions (ciphertext).
+
+import _sodium from "libsodium-wrappers-sumo"
+
+let sodium = null
+
+// Resolve once libsodium's WASM is initialized. Call (and await) before any op below.
+export async function ready() {
+  if (sodium) return sodium
+  await _sodium.ready
+  sodium = _sodium
+  return sodium
+}
+
+// ---------- base64 helpers (standard variant, so it round-trips through JSON/HTTP) ----------
+
+export function toB64(bytes) {
+  return sodium.to_base64(bytes, sodium.base64_variants.ORIGINAL)
+}
+
+export function fromB64(str) {
+  return sodium.from_base64(str, sodium.base64_variants.ORIGINAL)
+}
+
+// ---------- identity: passphrase -> X25519 keypair ----------
+
+// A fresh, public, per-user salt. Stored in the vault alongside the public key.
+export function generateSalt() {
+  return toB64(sodium.randombytes_buf(sodium.crypto_pwhash_SALTBYTES))
+}
+
+// Deterministically derive an X25519 keypair from (passphrase, salt).
+// Same inputs always produce the same keys, so the private key never has to be stored.
+export async function deriveKeypairFromPassphrase(passphrase, saltB64) {
+  await ready()
+  const salt = fromB64(saltB64)
+  const seed = sodium.crypto_pwhash(
+    sodium.crypto_box_SEEDBYTES, // 32-byte seed for the X25519 keypair
+    passphrase,
+    salt,
+    sodium.crypto_pwhash_OPSLIMIT_MODERATE,
+    sodium.crypto_pwhash_MEMLIMIT_MODERATE,
+    sodium.crypto_pwhash_ALG_ARGON2ID13,
+  )
+  const kp = sodium.crypto_box_seed_keypair(seed)
+  // Wipe the seed from memory; keypair is what we keep for the session.
+  sodium.memzero(seed)
+  return {
+    publicKey: kp.publicKey, // Uint8Array (32)
+    privateKey: kp.privateKey, // Uint8Array (32) — session memory only
+    publicKeyB64: toB64(kp.publicKey),
+  }
+}
+
+// ---------- Access Key (AK): per-patient symmetric key ----------
+
+// 32 random bytes. Wraps every DEK for one patient. Rotated on hard-revoke.
+export function generateAK() {
+  return sodium.randombytes_buf(32) // Uint8Array (32)
+}
+
+// ---------- AK <-> viewer, via X25519 sealed box ----------
+
+// Seal the AK so ONLY the holder of viewerPub's private key can open it.
+// crypto_box_seal needs only the recipient's public key (anonymous sender).
+export function sealAKForViewer(akBytes, viewerPubB64) {
+  const sealed = sodium.crypto_box_seal(akBytes, fromB64(viewerPubB64))
+  return toB64(sealed)
+}
+
+// Open a sealed AK envelope with the viewer's own keypair.
+export function openAKEnvelope(sealedB64, viewerPubB64, viewerPrivBytes) {
+  const opened = sodium.crypto_box_seal_open(fromB64(sealedB64), fromB64(viewerPubB64), viewerPrivBytes)
+  if (!opened) throw new Error("AK envelope could not be opened (wrong key or tampered)")
+  return opened // Uint8Array (32) — the AK
+}
+
+// ---------- DEK <-> AK, via AES-256-GCM (Web Crypto) ----------
+// Every symmetric op in this system is AES-256-GCM; here the "message" is a 32-byte DEK.
+
+async function importAKAsAesKey(akBytes) {
+  return crypto.subtle.importKey("raw", akBytes, { name: "AES-GCM" }, false, ["encrypt", "decrypt"])
+}
+
+// Wrap a DEK under the AK. Returns { wrappedDek, nonce } (both base64).
+export async function wrapDEK(dekBytes, akBytes) {
+  const key = await importAKAsAesKey(akBytes)
+  const nonce = crypto.getRandomValues(new Uint8Array(12)) // fresh 96-bit IV per wrap
+  const ct = new Uint8Array(await crypto.subtle.encrypt({ name: "AES-GCM", iv: nonce }, key, dekBytes))
+  return { wrappedDek: toB64(ct), nonce: toB64(nonce) }
+}
+
+// Unwrap a DEK under the AK. Returns the raw DEK bytes (Uint8Array).
+export async function unwrapDEK(wrappedDekB64, nonceB64, akBytes) {
+  const key = await importAKAsAesKey(akBytes)
+  const pt = await crypto.subtle.decrypt({ name: "AES-GCM", iv: fromB64(nonceB64) }, key, fromB64(wrappedDekB64))
+  return new Uint8Array(pt) // Uint8Array (32) — the DEK
+}
+=== FILE: C:\EHR\frontend\lib\crypto\keySession.js ===
+// keySession.js — browser-only session for the user's decrypted key material.
+//
+// unlockIdentity() runs Step 5 of the encryption flow:
+//   1. Look up the user's public key + salt in the vault.
+//   2. First use: generate a salt, derive the X25519 keypair, publish { publicKey, salt }.
+//      Later uses: re-derive with the stored salt and check it matches the stored public
+//      key (this is how a wrong passphrase is detected).
+//   3. Patients only: on first login create the AK and seal it to their own public key;
+//      on later logins fetch that envelope and open it.
+//
+// The private key and AK live only in React state (KeySessionProvider). They are never
+// written to localStorage, cookies, or sent to the server. A full page reload drops them,
+// and the user has to log in again.
+
+import { createContext, useCallback, useContext, useMemo, useState } from "react"
+
+export function patientIdentity(patientId) {
+  return `patient:${parseInt(patientId, 10)}`
+}
+
+export function doctorIdentity(doctorId) {
+  return `doctor:${parseInt(doctorId, 10)}`
+}
+
+async function readJson(res) {
+  try {
+    return await res.json()
+  } catch {
+    return {}
+  }
+}
+
+async function fetchPublicKey(identity) {
+  const res = await fetch(`/api/keyvault/publicKey?identity=${encodeURIComponent(identity)}`)
+  if (res.status === 404) return null
+  const data = await readJson(res)
+  if (!res.ok) throw new Error(data.error || "Failed to load public key")
+  return data // { identity, x25519Pub, salt }
+}
+
+async function publishPublicKey(identity, publicKey, salt) {
+  const res = await fetch("/api/keyvault/publicKey", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ identity, publicKey, salt }),
+  })
+  const data = await readJson(res)
+  if (!res.ok) throw new Error(data.error || "Failed to publish public key")
+}
+
+async function fetchOwnAkEnvelope(patientId) {
+  const res = await fetch(`/api/keyvault/getEnvelope?patientId=${encodeURIComponent(patientId)}&role=patient`)
+  if (res.status === 404) return null
+  const data = await readJson(res)
+  if (!res.ok) throw new Error(data.error || "Failed to load access key envelope")
+  return data.akEnvelope // { sealed, akVersion }
+}
+
+async function storeAkEnvelope(patientId, identity, sealed, akVersion) {
+  const res = await fetch("/api/keyvault/putEnvelope", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ type: "ak", patientId, identity, sealed, akVersion }),
+  })
+  const data = await readJson(res)
+  if (!res.ok) throw new Error(data.error || "Failed to store access key envelope")
+}
+
+function wipe(bytes) {
+  if (bytes instanceof Uint8Array) bytes.fill(0)
+}
+
+function wipeSession(session) {
+  if (!session) return
+  wipe(session.privateKey)
+  wipe(session.ak)
+}
+
+// role: "patient" | "doctor". id: patientId or doctorId.
+export async function unlockIdentity({ role, id, passphrase }) {
+  if (typeof window === "undefined") throw new Error("unlockIdentity must run in the browser")
+  if (role !== "patient" && role !== "doctor") throw new Error(`Unknown role: ${role}`)
+  if (!passphrase) throw new Error("Encryption passphrase is required")
+  const numericId = parseInt(id, 10)
+  if (Number.isNaN(numericId)) throw new Error("Invalid id")
+
+  const km = await import("./keyManagement")
+  await km.ready()
+
+  const identity = role === "patient" ? patientIdentity(numericId) : doctorIdentity(numericId)
+  const record = await fetchPublicKey(identity)
+
+  let keypair
+  let isFirstUse = false
+  if (!record) {
+    isFirstUse = true
+    const salt = km.generateSalt()
+    keypair = await km.deriveKeypairFromPassphrase(passphrase, salt)
+    await publishPublicKey(identity, keypair.publicKeyB64, salt)
+  } else {
+    keypair = await km.deriveKeypairFromPassphrase(passphrase, record.salt)
+    if (keypair.publicKeyB64 !== record.x25519Pub) {
+      wipe(keypair.privateKey)
+      throw new Error("Incorrect encryption passphrase")
+    }
+  }
+
+  let ak = null
+  let akVersion = null
+  if (role === "patient") {
+    const envelope = await fetchOwnAkEnvelope(numericId)
+    if (!envelope) {
+      ak = km.generateAK()
+      akVersion = 1
+      const sealed = km.sealAKForViewer(ak, keypair.publicKeyB64)
+      await storeAkEnvelope(numericId, identity, sealed, akVersion)
+    } else {
+      try {
+        ak = km.openAKEnvelope(envelope.sealed, keypair.publicKeyB64, keypair.privateKey)
+      } catch (err) {
+        wipe(keypair.privateKey)
+        throw err
+      }
+      akVersion = envelope.akVersion ?? 1
+    }
+  }
+
+  return {
+    role,
+    id: String(numericId),
+    identity,
+    publicKeyB64: keypair.publicKeyB64,
+    privateKey: keypair.privateKey, // Uint8Array — memory only
+    ak, // Uint8Array | null — patients only; doctors fetch per-patient AKs when viewing
+    akVersion,
+    isFirstUse,
+  }
+}
+
+const KeySessionContext = createContext(null)
+
+export function KeySessionProvider({ children }) {
+  const [session, setSession] = useState(null)
+
+  const unlock = useCallback(async (args) => {
+    const next = await unlockIdentity(args)
+    setSession((prev) => {
+      wipeSession(prev)
+      return next
+    })
+    return next
+  }, [])
+
+  const lock = useCallback(() => {
+    setSession((prev) => {
+      wipeSession(prev)
+      return null
+    })
+  }, [])
+
+  const value = useMemo(() => ({ session, unlock, lock }), [session, unlock, lock])
+  return <KeySessionContext.Provider value={value}>{children}</KeySessionContext.Provider>
+}
+
+export function useKeySession() {
+  const ctx = useContext(KeySessionContext)
+  if (!ctx) throw new Error("useKeySession must be used inside KeySessionProvider")
+  return ctx
+}
+=== FILE: C:\EHR\frontend\lib\constants.js ===
+import DoctorPatient from '../../artifacts/contracts/DoctorPatient.sol/DoctorPatient.json';
+
+// ---------------------------------------------------------------- //
+// !! IMPORTANT !!
+// PASTE YOUR DEPLOYED CONTRACT ADDRESS HERE
+// !! IMPORTANT !!
+// ---------------------------------------------------------------- //
+export const contractAddress = "0x5FbDB2315678afecb367f032d93F642f64180aa3"; // <-- PASTE YOUR ADDRESS
+
+export const contractABI = DoctorPatient.abi;
+
+// Local Hardhat node
+export const providerUrl = "http://localhost:8545";
+
+// Local IPFS node
+export const ipfsHost = 'localhost';
+export const ipfsApiPort = 5001; // Port for uploading
+export const ipfsGatewayPort = 8080; // Port for viewing
+export const ipfsProtocol = 'http';
+
+// Hardhat's default (first account) private key, used for admin tasks like registerPatient
+// In a real app, this key would be in a secure .env file.
+export const adminPrivateKey = "0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80";
+=== FILE: C:\EHR\frontend\lib\db-handler.js ===
+import fs from 'fs';
+import path from 'path';
+
+// Path to our new JSON database file
+// This path now goes UP one level from 'frontend' to the project root.
+const dbPath = path.join(process.cwd(), '..', 'db.json');
+
+// Initial data to write if the file doesn't exist
+const initialData = {
+  1: {
+    name: "Dr. Rakib Hasan",
+    referencePhotoUrl: "/photos/dr_rakib.jpg",
+    passwordHash: null,
+  },
+  2: {
+    name: "Dr. Ashikul Islam",
+    referencePhotoUrl: "/photos/dr_ashik.jpg",
+    passwordHash: null,
+  },
+  3: {
+    name: "Dr. Maliha Rahman",
+    referencePhotoUrl: "/photos/dr_maliha.jpg",
+    passwordHash: null,
+  },
+  4: {
+    name: "Dr. Saqiul Islam",
+    referencePhotoUrl: "/photos/dr_saqi.jpg",
+    passwordHash: null,
+  }, 
+  5: {
+    name: "Dr. Mezbah Uddin",
+    referencePhotoUrl: "/photos/dr_mezbah.jpg",
+    passwordHash: null,
+  }, 
+  6: {
+    name: "Dr. Arman Sarkar",
+    referencePhotoUrl: "/photos/dr_arman.jpg",
+    passwordHash: null,
+  }
+};
+
+// Function to read the database
+export function readDoctorDB() {
+  try {
+    // If file doesn't exist, create it with initial data
+    if (!fs.existsSync(dbPath)) {
+      fs.writeFileSync(dbPath, JSON.stringify(initialData, null, 2));
+      return initialData;
+    }
+    // If it exists, read it
+    const fileData = fs.readFileSync(dbPath, 'utf8');
+    return JSON.parse(fileData);
+  } catch (e) {
+    console.error("Failed to read DB, returning initial data", e);
+    return initialData; // Fallback
+  }
+}
+
+// Function to write to the database
+export function writeDoctorDB(data) {
+  try {
+    fs.writeFileSync(dbPath, JSON.stringify(data, null, 2), 'utf8');
+  } catch (e) {
+    console.error("Failed to write to DB", e);
+  }
+}
+=== FILE: C:\EHR\frontend\lib\ethClient.js ===
+import { ethers } from "ethers";
+import { contractAddress, contractABI, providerUrl } from "./constants";
+
+// Build a contract instance signed by a locally-held private key.
+//
+// SECURITY: This runs in the browser only. The private key is used to sign the
+// transaction locally against the RPC endpoint and is NEVER transmitted to any
+// API route or server. Do not import this module from `pages/api/*`.
+export function getSignedContract(privateKey) {
+  if (typeof window === "undefined") {
+    throw new Error("getSignedContract must only be called in the browser.");
+  }
+  const provider = new ethers.JsonRpcProvider(providerUrl);
+  const wallet = new ethers.Wallet(privateKey, provider);
+  const contract = new ethers.Contract(contractAddress, contractABI, wallet);
+  return { provider, wallet, contract };
+}
+
+// Compute gas/cost metrics from a mined transaction receipt (for thesis measurements).
+export async function computeTxMetrics(provider, receipt) {
+  const gasUsed = receipt.gasUsed;
+  const feeData = await provider.getFeeData();
+  const gasPrice = feeData.gasPrice || 1000000000n; // Default 1 Gwei on local Hardhat
+  const costWei = gasUsed * gasPrice;
+  const costEth = ethers.formatEther(costWei);
+  const costUsd = (parseFloat(costEth) * 3000).toFixed(4); // Assumed ETH price for the paper
+  return { gasUsed: gasUsed.toString(), costEth, costUsd };
+}
+=== FILE: C:\EHR\frontend\lib\face-api-server.js ===
+// Server-side face-api helper for Node.js environment
+import * as faceapi from 'face-api.js';
+import { Canvas, Image } from 'canvas';
+import fetch from 'node-fetch';
+
+// Register canvas with face-api
+faceapi.env.monkeyPatch({ Canvas, Image, fetch });
+
+// Global state to track if models are loaded
+let modelsLoaded = false;
+
+/**
+ * Load face-api models from disk (call once at server startup)
+ * @param {string} modelPath - Path to the models directory
+ */
+export async function loadModels(modelPath) {
+  if (modelsLoaded) {
+    console.log("[face-api] Models already loaded, skipping...");
+    return;
+  }
+
+  try {
+    console.log("[face-api] Loading models from:", modelPath);
+    
+    await Promise.all([
+      faceapi.nets.ssdMobilenetv1.loadFromDisk(modelPath),
+      faceapi.nets.faceLandmark68Net.loadFromDisk(modelPath),
+      faceapi.nets.faceRecognitionNet.loadFromDisk(modelPath),
+      faceapi.nets.faceExpressionNet.loadFromDisk(modelPath),
+    ]);
+
+    modelsLoaded = true;
+    console.log("[face-api] All models loaded successfully!");
+  } catch (error) {
+    console.error("[face-api] Error loading models:", error.message);
+    throw error;
+  }
+}
+
+/**
+ * Ensure models are loaded before processing
+ */
+export function ensureModelsLoaded() {
+  if (!modelsLoaded) {
+    throw new Error('Face-API models not loaded. Call loadModels() first.');
+  }
+}
+
+/**
+ * Convert file buffer to face-api compatible Image
+ */
+export function bufferToImage(buffer) {
+  const img = new Image();
+  img.src = buffer;
+  return img;
+}
+
+/**
+ * Extract face descriptor from image
+ */
+export async function getFaceDescriptor(image) {
+  const detection = await faceapi
+    .detectSingleFace(image)
+    .withFaceLandmarks()
+    .withFaceDescriptor();
+
+  return detection;
+}
+
+/**
+ * Compare two face descriptors
+ * Returns: { distance, confidence, isMatch }
+ */
+export function compareFaces(descriptor1, descriptor2, threshold = 0.6) {
+  const faceMatcher = new faceapi.FaceMatcher([descriptor1]);
+  const match = faceMatcher.findBestMatch(descriptor2);
+
+  const distance = match.distance;
+  const isMatch = distance <= threshold;
+  const confidence = Math.max(0, Math.round((1 - distance) * 100));
+
+  return { distance, confidence, isMatch };
+}
+
+export default {
+  loadModels,
+  ensureModelsLoaded,
+  bufferToImage,
+  getFaceDescriptor,
+  compareFaces,
+  faceapi, // Export faceapi instance for direct use
+};
+=== FILE: C:\EHR\frontend\lib\keyvault-handler.js ===
+import fs from 'fs';
+import path from 'path';
+
+// The key vault lives at the project root, next to db.json / patients.json.
+// It ONLY ever holds public keys and *wrapped* (encrypted) key material:
+//   - publicKeys:  each user's X25519 public key + public Argon2id salt
+//   - akEnvelopes: the per-patient Access Key (AK), sealed to each viewer's X25519 public key
+//   - dekEnvelopes: each document's DEK, wrapped under the patient's AK (symmetric)
+// No plaintext private key, AK, or DEK is ever stored here. (Path A / zero-trust backend.)
+const vaultPath = path.join(process.cwd(), '..', 'keyvault.json');
+
+const initialData = {
+  publicKeys: {},   // identity ("patient:1" | "doctor:2") -> { x25519Pub, salt }
+  akEnvelopes: {},  // patientId -> { identity -> { sealed, akVersion } }
+  dekEnvelopes: {}, // patientId -> { docId -> { wrappedDek, nonce, cid, akVersion } }
+};
+
+// Canonical identity strings so we never depend on wallet-address lookups.
+export function patientIdentity(patientId) {
+  return `patient:${parseInt(patientId, 10)}`;
+}
+export function doctorIdentity(doctorId) {
+  return `doctor:${parseInt(doctorId, 10)}`;
+}
+
+export function readVault() {
+  try {
+    if (!fs.existsSync(vaultPath)) {
+      fs.writeFileSync(vaultPath, JSON.stringify(initialData, null, 2));
+      return structuredClone(initialData);
+    }
+    const fileData = fs.readFileSync(vaultPath, 'utf8');
+    const parsed = JSON.parse(fileData);
+    // Make sure the top-level buckets always exist.
+    return {
+      publicKeys: parsed.publicKeys || {},
+      akEnvelopes: parsed.akEnvelopes || {},
+      dekEnvelopes: parsed.dekEnvelopes || {},
+    };
+  } catch (e) {
+    console.error('Failed to read key vault, returning empty vault', e);
+    return structuredClone(initialData);
+  }
+}
+
+export function writeVault(data) {
+  try {
+    fs.writeFileSync(vaultPath, JSON.stringify(data, null, 2), 'utf8');
+  } catch (e) {
+    console.error('Failed to write to key vault', e);
+    throw e;
+  }
+}
+
+// ---- Public key registry ------------------------------------------------ //
+
+export function getPublicKey(identity) {
+  const vault = readVault();
+  return vault.publicKeys[identity] || null;
+}
+
+export function setPublicKey(identity, x25519Pub, salt) {
+  const vault = readVault();
+  vault.publicKeys[identity] = { x25519Pub, salt };
+  writeVault(vault);
+  return vault.publicKeys[identity];
+}
+
+// ---- AK envelopes (per patient, sealed per viewer) ---------------------- //
+
+export function putAkEnvelope(patientId, identity, sealed, akVersion) {
+  const vault = readVault();
+  const pid = String(parseInt(patientId, 10));
+  if (!vault.akEnvelopes[pid]) vault.akEnvelopes[pid] = {};
+  vault.akEnvelopes[pid][identity] = { sealed, akVersion };
+  writeVault(vault);
+}
+
+export function getAkEnvelope(patientId, identity) {
+  const vault = readVault();
+  const pid = String(parseInt(patientId, 10));
+  return vault.akEnvelopes[pid]?.[identity] || null;
+}
+
+export function deleteAkEnvelope(patientId, identity) {
+  const vault = readVault();
+  const pid = String(parseInt(patientId, 10));
+  if (vault.akEnvelopes[pid]?.[identity]) {
+    delete vault.akEnvelopes[pid][identity];
+    writeVault(vault);
+    return true;
+  }
+  return false;
+}
+
+// ---- DEK envelopes (per patient, per document) -------------------------- //
+
+export function putDekEnvelope(patientId, docId, envelope) {
+  const vault = readVault();
+  const pid = String(parseInt(patientId, 10));
+  if (!vault.dekEnvelopes[pid]) vault.dekEnvelopes[pid] = {};
+  vault.dekEnvelopes[pid][docId] = envelope; // { wrappedDek, nonce, cid, akVersion }
+  writeVault(vault);
+}
+
+export function getDekEnvelopes(patientId) {
+  const vault = readVault();
+  const pid = String(parseInt(patientId, 10));
+  return vault.dekEnvelopes[pid] || {};
+}
+
+// Hard-revoke helper: atomically replace a patient's AK + DEK envelopes with a
+// freshly re-wrapped set (new AK version). Any viewer not present in
+// newAkEnvelopes is dropped (that is how a doctor is cryptographically cut off).
+export function replacePatientEnvelopes(patientId, newAkEnvelopes, newDekEnvelopes) {
+  const vault = readVault();
+  const pid = String(parseInt(patientId, 10));
+  vault.akEnvelopes[pid] = newAkEnvelopes;
+  vault.dekEnvelopes[pid] = newDekEnvelopes;
+  writeVault(vault);
+}
+=== FILE: C:\EHR\frontend\lib\liveness-utils.js ===
+import * as ort from 'onnxruntime-node';
+import sharp from 'sharp';
+import path from 'path';
+
+let padSession27 = null;
+let padSession40 = null;
+
+export async function getPadSessions() {
+  if (!padSession27) {
+    const modelPath27 = path.join(process.cwd(), 'server_models', 'pad', 'MiniFASNetV2_2.7.onnx');
+    padSession27 = await ort.InferenceSession.create(modelPath27);
+  }
+  if (!padSession40) {
+    const modelPath40 = path.join(process.cwd(), 'server_models', 'pad', 'MiniFASNetV1SE_4.0.onnx');
+    padSession40 = await ort.InferenceSession.create(modelPath40);
+  }
+  return { padSession27, padSession40 };
+}
+
+function softmax(logits) {
+  const maxLogit = Math.max(...logits);
+  const exps = logits.map((l) => Math.exp(l - maxLogit));
+  const sumExps = exps.reduce((a, b) => a + b, 0);
+  return exps.map((e) => e / sumExps);
+}
+
+function getExpandedBox(box, imgWidth, imgHeight, scale) {
+  const { x, y, width, height } = box;
+  const centerX = x + width / 2;
+  const centerY = y + height / 2;
+  const newSize = Math.min(imgWidth, imgHeight, Math.max(width, height) * scale);
+  let left = Math.round(centerX - newSize / 2);
+  let top = Math.round(centerY - newSize / 2);
+  let size = Math.round(newSize);
+  if (left < 0) left = 0;
+  if (top < 0) top = 0;
+  if (left + size > imgWidth) size = imgWidth - left;
+  if (top + size > imgHeight) size = imgHeight - top;
+  return { left, top, width: size, height: size };
+}
+
+async function preprocessForMiniFASNet(imageBuffer, faceBox, scale) {
+  const metadata = await sharp(imageBuffer).metadata();
+  const cropBox = getExpandedBox(faceBox, metadata.width, metadata.height, scale);
+  const { data } = await sharp(imageBuffer)
+    .extract(cropBox)
+    .resize(80, 80, { fit: 'fill' })
+    .removeAlpha()
+    .raw()
+    .toBuffer({ resolveWithObject: true });
+  const float32Data = new Float32Array(3 * 80 * 80);
+  const area = 80 * 80;
+  for (let i = 0; i < area; i++) {
+    const r = data[i * 3];
+    const g = data[i * 3 + 1];
+    const b = data[i * 3 + 2];
+    float32Data[i] = b;
+    float32Data[area + i] = g;
+    float32Data[2 * area + i] = r;
+  }
+  return new (await import('onnxruntime-node')).Tensor('float32', float32Data, [1, 3, 80, 80]);
+}
+
+export async function evaluateAntiSpoofing(imageBuffer, faceBox) {
+  const { padSession27, padSession40 } = await getPadSessions();
+  const tensor27 = await preprocessForMiniFASNet(imageBuffer, faceBox, 2.7);
+  const tensor40 = await preprocessForMiniFASNet(imageBuffer, faceBox, 4.0);
+  const out27 = await padSession27.run({ [padSession27.inputNames[0]]: tensor27 });
+  const out40 = await padSession40.run({ [padSession40.inputNames[0]]: tensor40 });
+  const probs27 = softmax(Array.from(out27[padSession27.outputNames[0]].data));
+  const probs40 = softmax(Array.from(out40[padSession40.outputNames[0]].data));
+  const realScore = (probs27[1] + probs40[1]) / 2;
+  return { isReal: realScore > 0.85, realScore, printSpoofScore: (probs27[0]+probs40[0])/2, replaySpoofScore: (probs27[2]+probs40[2])/2 };
+}
+
+const dist = (p1, p2) => Math.hypot(p1.x - p2.x, p1.y - p2.y);
+
+export function calculateEAR(landmarks) {
+  const pts = landmarks.positions;
+  const leftEAR = (dist(pts[37], pts[41]) + dist(pts[38], pts[40])) / (2.0 * dist(pts[36], pts[39]));
+  const rightEAR = (dist(pts[43], pts[47]) + dist(pts[44], pts[46])) / (2.0 * dist(pts[42], pts[45]));
+  return (leftEAR + rightEAR) / 2.0;
+}
+
+export function calculateYawRatio(landmarks) {
+  const pts = landmarks.positions;
+  const noseTip = pts[30];
+  const leftEdge = pts[1];
+  const rightEdge = pts[15];
+  const dLeft = dist(noseTip, leftEdge);
+  const dRight = dist(noseTip, rightEdge);
+  return dLeft / (dRight + 1e-6);
+}
+
+export function calculateSmileRatio(landmarks) {
+  const pts = landmarks.positions;
+  const mouthWidth = dist(pts[48], pts[54]);
+  const jawWidth = dist(pts[3], pts[13]);
+  return mouthWidth / (jawWidth + 1e-6);
+}
+=== FILE: C:\EHR\frontend\pages\api\keyvault\deleteEnvelope.js ===
+import { deleteAkEnvelope } from '../../../lib/keyvault-handler';
+
+// Endpoint for Soft Revocation
+// Deletes the specified identity's AK envelope from the vault, preventing them from fetching it again.
+export default async function handler(req, res) {
+  if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
+  
+  try {
+    const { patientId, identity } = req.body;
+    
+    if (patientId == null || !identity) {
+        return res.status(400).json({ error: 'Missing patientId or identity parameters' });
+    }
+    
+    const success = deleteAkEnvelope(patientId, identity);
+    
+    if (success) {
+        return res.status(200).json({ success: true, message: "Envelope deleted successfully." });
+    } else {
+        return res.status(404).json({ error: 'Envelope not found or already deleted.' });
+    }
+  } catch (err) {
+    return res.status(500).json({ error: err.message });
+  }
+}
+=== FILE: C:\EHR\frontend\pages\api\keyvault\getEnvelope.js ===
+import { ethers } from 'ethers';
+import { contractAddress, contractABI, providerUrl } from '../../../lib/constants';
+import {
+  getAkEnvelope,
+  getDekEnvelopes,
+  patientIdentity,
+  doctorIdentity,
+} from '../../../lib/keyvault-handler';
+
+// Returns the wrapped key material a viewer needs to decrypt a patient's
+// documents: the viewer's own AK envelope (sealed to their X25519 key) plus
+// every DEK envelope for that patient.
+//
+// Access is gated against the ON-CHAIN authority (defense in depth — the AK
+// envelope is sealed to the viewer's public key, so a wrong caller could not
+// decrypt it anyway):
+//   - The patient may always fetch their own envelopes.
+//   - A doctor is allowed only while isDoctorAuthorized(patientId, doctorId)
+//     is true on-chain. Soft-revoke deletes their AK envelope; hard-revoke
+//     rotates the AK. Either way this route stops serving a usable key.
+//
+// Query: /api/keyvault/getEnvelope?patientId=1&role=doctor&doctorId=2
+//        /api/keyvault/getEnvelope?patientId=1&role=patient
+export default async function handler(req, res) {
+  if (req.method !== 'GET') {
+    return res.status(405).json({ error: 'Method not allowed' });
+  }
+
+  try {
+    const patientId = parseInt(req.query.patientId, 10);
+    const role = req.query.role;
+
+    if (Number.isNaN(patientId) || !role) {
+      return res.status(400).json({ error: 'Missing patientId or role' });
+    }
+
+    let identity;
+
+    if (role === 'patient') {
+      identity = patientIdentity(patientId);
+    } else if (role === 'doctor') {
+      const doctorId = parseInt(req.query.doctorId, 10);
+      if (Number.isNaN(doctorId)) {
+        return res.status(400).json({ error: 'Missing doctorId' });
+      }
+
+      // Authoritative check: is this doctor currently granted on-chain?
+      const provider = new ethers.JsonRpcProvider(providerUrl);
+      const contract = new ethers.Contract(contractAddress, contractABI, provider);
+      const authorized = await contract.isDoctorAuthorized(patientId, doctorId);
+      if (!authorized) {
+        return res.status(403).json({ error: 'Doctor is not authorized for this patient' });
+      }
+
+      identity = doctorIdentity(doctorId);
+    } else {
+      return res.status(400).json({ error: 'Unknown role (expected "patient" or "doctor")' });
+    }
+
+    const akEnvelope = getAkEnvelope(patientId, identity);
+    if (!akEnvelope) {
+      // No AK envelope => this viewer has no (or a revoked) key wrap.
+      return res.status(404).json({ error: 'No access-key envelope for this viewer' });
+    }
+
+    const dekEnvelopes = getDekEnvelopes(patientId);
+
+    return res.status(200).json({
+      success: true,
+      identity,
+      akEnvelope,        // { sealed, akVersion }
+      dekEnvelopes,      // { docId -> { wrappedDek, nonce, cid, akVersion } }
+    });
+  } catch (error) {
+    return res.status(500).json({ error: error.message });
+  }
+}
+=== FILE: C:\EHR\frontend\pages\api\keyvault\publicKey.js ===
+import { getPublicKey, setPublicKey } from '../../../lib/keyvault-handler';
+
+// Public-key registry for X25519 identities. Only PUBLIC material is stored:
+// the X25519 public key and the public Argon2id salt used to re-derive it.
+//
+//   GET  /api/keyvault/publicKey?identity=patient:1
+//        -> 200 { x25519Pub, salt } | 404
+//   POST /api/keyvault/publicKey  { identity, publicKey, salt }
+//        -> 201 on first publish, 200 if the same key is re-published,
+//           409 if a DIFFERENT key already exists (keys are write-once so a
+//           caller cannot silently swap someone's key and intercept future AK seals).
+
+const IDENTITY_RE = /^(patient|doctor):\d+$/;
+
+function decodedLength(b64) {
+  if (typeof b64 !== 'string' || !/^[A-Za-z0-9+/]+={0,2}$/.test(b64)) return -1;
+  return Buffer.from(b64, 'base64').length;
+}
+
+export default async function handler(req, res) {
+  try {
+    if (req.method === 'GET') {
+      const identity = req.query.identity;
+      if (!IDENTITY_RE.test(identity || '')) {
+        return res.status(400).json({ error: 'Invalid identity' });
+      }
+      const record = getPublicKey(identity);
+      if (!record) return res.status(404).json({ error: 'No public key for this identity' });
+      return res.status(200).json({ identity, ...record });
+    }
+
+    if (req.method === 'POST') {
+      const { identity, publicKey, salt } = req.body || {};
+      if (!IDENTITY_RE.test(identity || '')) {
+        return res.status(400).json({ error: 'Invalid identity' });
+      }
+      if (decodedLength(publicKey) !== 32) {
+        return res.status(400).json({ error: 'publicKey must be a base64 32-byte X25519 key' });
+      }
+      if (decodedLength(salt) !== 16) {
+        return res.status(400).json({ error: 'salt must be a base64 16-byte Argon2id salt' });
+      }
+
+      const existing = getPublicKey(identity);
+      if (existing) {
+        if (existing.x25519Pub === publicKey && existing.salt === salt) {
+          return res.status(200).json({ success: true, identity, created: false });
+        }
+        return res.status(409).json({ error: 'A different public key is already registered for this identity' });
+      }
+
+      setPublicKey(identity, publicKey, salt);
+      return res.status(201).json({ success: true, identity, created: true });
+    }
+
+    return res.status(405).json({ error: 'Method not allowed' });
+  } catch (error) {
+    return res.status(500).json({ error: error.message });
+  }
+}
+=== FILE: C:\EHR\frontend\pages\api\keyvault\putEnvelope.js ===
+import {
+  putAkEnvelope,
+  putDekEnvelope,
+} from '../../../lib/keyvault-handler';
+
+// Stores wrapped key material produced entirely in the browser.
+// The server never sees a plaintext AK, DEK, or private key here — only
+// sealed/wrapped ciphertext blobs. Two shapes are accepted:
+//
+//   { type: "ak",  patientId, identity, sealed, akVersion }
+//   { type: "dek", patientId, docId, wrappedDek, nonce, cid, akVersion }
+//
+export default async function handler(req, res) {
+  if (req.method !== 'POST') {
+    return res.status(405).json({ error: 'Method not allowed' });
+  }
+
+  try {
+    const { type } = req.body;
+
+    if (type === 'ak') {
+      const { patientId, identity, sealed, akVersion } = req.body;
+      if (patientId == null || !identity || !sealed) {
+        return res.status(400).json({ error: 'Missing patientId, identity, or sealed AK envelope' });
+      }
+      putAkEnvelope(patientId, identity, sealed, akVersion ?? 1);
+      return res.status(200).json({ success: true, stored: 'ak', identity });
+    }
+
+    if (type === 'dek') {
+      const { patientId, docId, wrappedDek, nonce, cid, akVersion } = req.body;
+      if (patientId == null || !docId || !wrappedDek || !nonce) {
+        return res.status(400).json({ error: 'Missing patientId, docId, wrappedDek, or nonce' });
+      }
+      putDekEnvelope(patientId, docId, {
+        wrappedDek,
+        nonce,
+        cid: cid ?? null,
+        akVersion: akVersion ?? 1,
+      });
+      return res.status(200).json({ success: true, stored: 'dek', docId });
+    }
+
+    return res.status(400).json({ error: 'Unknown envelope type (expected "ak" or "dek")' });
+  } catch (error) {
+    return res.status(500).json({ error: error.message });
+  }
+}
+=== FILE: C:\EHR\frontend\pages\api\keyvault\rotateAK.js ===
+import { replacePatientEnvelopes } from '../../../lib/keyvault-handler';
+
+// Hard revoke: the patient's browser generates a NEW Access Key (AK), re-wraps
+// every DEK under it, and re-seals the new AK for every viewer that should
+// keep access (i.e. everyone EXCEPT the revoked doctor). It sends the complete
+// replacement set here, and we swap it in atomically.
+//
+// Files on IPFS are never re-uploaded — only the (key-sized) envelopes change.
+//
+// Body:
+//   {
+//     patientId,
+//     akEnvelopes:  { identity -> { sealed, akVersion } },   // remaining viewers only
+//     dekEnvelopes: { docId -> { wrappedDek, nonce, cid, akVersion } }
+//   }
+export default async function handler(req, res) {
+  if (req.method !== 'POST') {
+    return res.status(405).json({ error: 'Method not allowed' });
+  }
+
+  try {
+    const { patientId, akEnvelopes, dekEnvelopes } = req.body;
+
+    if (patientId == null || !akEnvelopes || !dekEnvelopes) {
+      return res.status(400).json({ error: 'Missing patientId, akEnvelopes, or dekEnvelopes' });
+    }
+
+    if (typeof akEnvelopes !== 'object' || typeof dekEnvelopes !== 'object') {
+      return res.status(400).json({ error: 'akEnvelopes and dekEnvelopes must be objects' });
+    }
+
+    replacePatientEnvelopes(patientId, akEnvelopes, dekEnvelopes);
+
+    return res.status(200).json({
+      success: true,
+      patientId: parseInt(patientId, 10),
+      viewers: Object.keys(akEnvelopes),
+      documents: Object.keys(dekEnvelopes).length,
+    });
+  } catch (error) {
+    return res.status(500).json({ error: error.message });
+  }
+}
+=== FILE: C:\EHR\frontend\pages\api\checkDoctor.js ===
+import { readDoctorDB } from '../../lib/db-handler';
+
+export default async function handler(req, res) {
+  if (req.method !== 'POST') {
+    return res.status(405).json({ error: 'Method not allowed' });
+  }
+
+  const { doctorId, doctorName } = req.body;
+  const doctorDatabase = readDoctorDB();
+
+  try {
+    const id = parseInt(doctorId, 10);
+
+    // 1. Check if doctor exists in our database
+    if (!doctorDatabase[id]) {
+      return res.status(404).json({ error: 'Doctor ID not found in our records.' });
+    }
+
+    // 2. Check if the name matches
+    if (doctorDatabase[id].name !== doctorName) {
+      return res.status(400).json({ error: 'Doctor ID and Name do not match.' });
+    }
+
+    // 3. Check if doctor is *already* registered (i.e., password is set)
+    if (doctorDatabase[id].passwordHash !== null) {
+      return res.status(400).json({ error: 'This doctor has already completed registration.' });
+    }
+
+    // If all checks pass, return the reference photo for verification
+    res.status(200).json({
+      message: 'Doctor validated. Proceed to face verification.',
+      referencePhotoUrl: doctorDatabase[id].referencePhotoUrl,
+    });
+
+  } catch (error) {
+    console.error('Error in checkDoctor:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+}
+=== FILE: C:\EHR\frontend\pages\api\checkLiveness.js ===
+import { loadModels, ensureModelsLoaded, bufferToImage, getFaceDescriptor } from '../../lib/face-api-server';
+import { evaluateAntiSpoofing, calculateEAR, calculateYawRatio, calculateSmileRatio } from '../../lib/liveness-utils';
+import crypto from 'crypto';
+import path from 'path';
+import { createCanvas, loadImage } from 'canvas';
+
+let modelsInitialized = false;
+
+export default async function handler(req, res) {
+  if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
+  try {
+    const { frame, challenge, completedToken } = req.body;
+    if (!frame) return res.status(400).json({ live: false, reason: 'no frame' });
+
+    if (!modelsInitialized) {
+      const MODEL_URL = path.join(process.cwd(), 'public', 'models');
+      await loadModels(MODEL_URL);
+      modelsInitialized = true;
+    }
+    ensureModelsLoaded();
+
+    const cleanBase64 = frame.replace(/^data:image\/\w+;base64,/, '');
+    const buf = Buffer.from(cleanBase64, 'base64');
+    const img = await loadImage('data:image/jpeg;base64,' + cleanBase64);
+
+    const detection = await getFaceDescriptor(img);
+    if (!detection) return res.status(200).json({ live: false, reason: 'no face', allDone: false, completed: [] });
+
+    const box = detection.detection ? detection.detection.box : detection.box;
+    const pad = await evaluateAntiSpoofing(buf, box);
+    const landmarks = detection.landmarks;
+    const ear = calculateEAR(landmarks);
+    const yaw = calculateYawRatio(landmarks);
+    const smile = calculateSmileRatio(landmarks);
+
+    let passed = false;
+    if (challenge === 'blink') passed = ear < 0.28;
+    else if (challenge === 'left') passed = yaw < 0.62;
+    else if (challenge === 'right') passed = yaw > 1.60;
+    else if (challenge === 'smile') passed = smile > 0.43;
+
+    // verify PAD
+    if (!pad.isReal || pad.realScore <= 0.85) passed = false;
+
+    // chain
+    const LIV_SECRET = process.env.LIVENESS_SECRET || 'ehr-biometric-liveness-hmac-secret-2026';
+    let completed = [];
+    let anchorDescriptor = null;
+    if (completedToken) {
+      try {
+        const [payload, sig] = completedToken.split('.');
+        const expected = crypto.createHmac('sha256', LIV_SECRET).update(payload).digest('hex');
+        if (sig === expected) {
+          const data = JSON.parse(Buffer.from(payload, 'base64').toString());
+          if (Date.now() - data.ts < 60000) {
+            completed = data.completed || [];
+            anchorDescriptor = data.anchorDescriptor || null;
+          }
+        }
+      } catch (e) {}
+    }
+
+    // identity continuity
+    const desc = Array.from(detection.descriptor);
+    if (anchorDescriptor) {
+      let d = 0;
+      for (let i = 0; i < desc.length; i++) d += (desc[i]-anchorDescriptor[i])**2;
+      d = Math.sqrt(d);
+      if (d >= 0.50) passed = false;
+    } else {
+      anchorDescriptor = desc;
+    }
+
+    if (passed && !completed.includes(challenge)) completed.push(challenge);
+
+    const allDone = completed.length === 4 && ['blink','left','right','smile'].every(c => completed.includes(c));
+
+    let token = null;
+    if (passed) {
+      const payloadObj = { ts: Date.now(), completed, anchorDescriptor, allDone };
+      const payload = Buffer.from(JSON.stringify(payloadObj)).toString('base64');
+      const sig = crypto.createHmac('sha256', LIV_SECRET).update(payload).digest('hex');
+      token = payload + '.' + sig;
+    }
+
+    console.log('[LIVENESS]', challenge, 'ear=',ear,'yaw=',yaw,'smile=',smile,'pad=',pad.realScore,'passed=',passed);
+    return res.status(200).json({ live: passed, allDone, completed, ear, yaw, smile, pad, token, reason: passed ? 'ok' : 'challenge not passed' });
+  } catch (e) {
+    return res.status(500).json({ live: false, reason: e.message, allDone: false, completed: [] });
+  }
+}
+
+
+
+
+=== FILE: C:\EHR\frontend\pages\api\completeDoctorRegistration.js ===
+import { ethers } from 'ethers';
+import bcrypt from 'bcryptjs';
+import { readDoctorDB, writeDoctorDB } from '../../lib/db-handler';
+import { 
+  contractAddress, 
+  contractABI, 
+  providerUrl, 
+  adminPrivateKey 
+} from '../../lib/constants';
+
+export default async function handler(req, res) {
+  if (req.method !== 'POST') {
+    return res.status(405).json({ error: 'Method not allowed' });
+  }
+
+  const { doctorId, password, walletAddress } = req.body;
+  const doctorDatabase = readDoctorDB();
+
+  let id;
+  let doctor;
+
+  try {
+    console.log("--- STARTING DOCTOR REGISTRATION ---");
+    const t_start = performance.now();
+
+    id = parseInt(doctorId, 10);
+    doctor = doctorDatabase[id];
+
+    // 1. Validation
+    if (!doctor) {
+      return res.status(404).json({ error: 'Doctor not found.' });
+    }
+    if (doctor.passwordHash !== null) {
+      return res.status(400).json({ error: 'Doctor already registered.' });
+    }
+
+    // 2. Hash Password (DO NOT SAVE TO DB YET)
+    const salt = await bcrypt.genSalt(10);
+    const hashedPassword = await bcrypt.hash(password, salt);
+
+    // ---------------------------------------------------------
+    // 3. BLOCKCHAIN REGISTRATION (With Nonce Fix)
+    // ---------------------------------------------------------
+    const provider = new ethers.JsonRpcProvider(providerUrl);
+    const walletSigner = new ethers.Wallet(adminPrivateKey, provider);
+    const contract = new ethers.Contract(contractAddress, contractABI, walletSigner);
+
+    // FIX: Get the exact current transaction count (nonce) for the Admin wallet
+    let currentNonce = await walletSigner.getNonce();
+
+    // Tx 1: Pre-register the doctor's data using the current nonce
+    console.log(`Sending Tx 1 with nonce: ${currentNonce}`);
+    const tx1 = await contract.registerDoctorData(id, doctor.name, { nonce: currentNonce });
+    const receipt1 = await tx1.wait();
+
+    // Tx 2: Finalize doctor registration using the NEXT nonce (+1)
+    console.log(`Sending Tx 2 with nonce: ${currentNonce + 1}`);
+    const tx2 = await contract.registerDoctor(doctor.name, id, walletAddress, { nonce: currentNonce + 1 });
+    const receipt2 = await tx2.wait();
+
+    // ---------------------------------------------------------
+    // 4. Update Mock Database ONLY AFTER BLOCKCHAIN SUCCESS
+    // ---------------------------------------------------------
+    doctorDatabase[id].passwordHash = hashedPassword;
+    doctorDatabase[id].wallet = walletAddress; 
+    writeDoctorDB(doctorDatabase);
+
+    // --- METRICS CALCULATION ---
+    const t_end = performance.now();
+    const latency = (t_end - t_start).toFixed(2);
+    const gasUsed1 = receipt1.gasUsed;
+    const gasUsed2 = receipt2.gasUsed;
+    const totalGas = gasUsed1 + gasUsed2;
+
+    const feeData = await provider.getFeeData();
+    const gasPrice = feeData.gasPrice || 1000000000n; 
+    
+    const costWei = totalGas * gasPrice;
+    const costEth = ethers.formatEther(costWei);
+    const ethPriceUsd = 3000; 
+    const costUsd = (parseFloat(costEth) * ethPriceUsd).toFixed(4);
+
+    console.log(`[METRIC] Registration Latency: ${latency} ms`);
+    console.log(`[METRIC] Tx1 Gas: ${gasUsed1} | Tx2 Gas: ${gasUsed2}`);
+    console.log(`[METRIC] Total Gas: ${totalGas}`);
+    console.log(`[METRIC] Total Cost: ${costEth} ETH ($${costUsd} USD)`);
+    console.log("------------------------------------");
+
+    res.status(200).json({ 
+      success: true, 
+      message: 'Registration complete!',
+      txHash: tx2.hash,
+      metrics: {
+        latency,
+        gasUsed: totalGas.toString(),
+        costUsd
+      }
+    });
+
+  } catch (error) {
+    console.error("Doctor Registration Error:", error);
+    res.status(500).json({ error: "Failed to register doctor", details: error.message });
+  }
+}
+=== FILE: C:\EHR\frontend\pages\api\getDoctors.js ===
+import { readDoctorDB } from '../../lib/db-handler';
+
+export default async function handler(req, res) {
+    if (req.method !== 'GET') {
+        return res.status(405).json({ error: 'Method not allowed' });
+    }
+
+    try {
+        const doctorDatabase = readDoctorDB();
+        
+        // Convert the dictionary { "1": {...} } into an array with IDs included
+        const allDoctors = Object.keys(doctorDatabase).map(key => ({
+            id: parseInt(key, 10),
+            ...doctorDatabase[key]
+        }));
+
+        // Filter only doctors who have completed registration (have a wallet)
+        const registeredDoctors = allDoctors.filter(
+            (d) => d.wallet !== null && d.wallet !== undefined && d.wallet !== ""
+        );
+        
+        // Format for the frontend dropdown
+        const formattedDoctors = registeredDoctors.map(doc => ({
+            id: doc.id,
+            name: doc.name,
+            wallet: doc.wallet
+        }));
+
+        res.status(200).json(formattedDoctors);
+    } catch (error) {
+        console.error("Error fetching doctors:", error);
+        res.status(500).json({ error: "Error fetching doctors from database" });
+    }
+}
+=== FILE: C:\EHR\frontend\pages\api\getDocumentsByDoctor.js ===
+import { ethers } from 'ethers';
+import { contractAddress, contractABI, providerUrl } from '../../lib/constants';
+
+export default async function handler(req, res) {
+  const { patientId, doctorId } = req.query;
+
+  // Parse to Integers
+  const pId = parseInt(patientId, 10);
+  const dId = parseInt(doctorId, 10);
+
+  const provider = new ethers.JsonRpcProvider(providerUrl);
+  const contract = new ethers.Contract(contractAddress, contractABI, provider);
+
+  try {
+    console.log("--- STARTING DOCTOR READ METRICS ---");
+    const t_start = performance.now(); // Start Timer
+
+    const isAuthorized = await contract.isDoctorAuthorized(pId, dId);
+    if (!isAuthorized) {
+      return res.status(403).json({ error: "Unauthorized access." });
+    }
+
+    const documents = await contract.getPateintDocumentsByDoctor(pId, dId);
+
+    const t_end = performance.now(); // End Timer
+    const readLatency = (t_end - t_start).toFixed(2);
+
+    console.log(`[METRIC] Data Fetch Latency: ${readLatency} ms`);
+    console.log("------------------------------------");
+
+    // Convert BigInts & map fields
+    const serializableDocuments = documents.map(doc => ({
+      patientId: Number(doc.patientId),
+      doctorId: Number(doc.doctorId),
+      docId: doc.docId, // <-- FIXED: Added missing docId
+      cid: doc.cid,
+      diseaseName: doc.diseaseName,
+      description: doc.description,
+      imageCID: doc.imageCID,
+      timestamp: Number(doc.timestamp)
+    }));
+
+    res.status(200).json(serializableDocuments);
+
+  } catch (error) {
+    res.status(500).json({ error: "Error fetching documents", details: error.message });
+  }
+}
+=== FILE: C:\EHR\frontend\pages\api\getPatientData.js ===
+import { ethers } from "ethers";
+import { contractAddress, contractABI, providerUrl } from '../../lib/constants';
+
+export default async function handler(req, res) {
+  if (req.method !== "GET") return res.status(405).json({ error: "Method not allowed" });
+
+  const { patientId } = req.query;
+  
+  // THE FIX: Parse to Integer
+  const pId = parseInt(patientId, 10);
+
+  if (!pId || isNaN(pId)) {
+    return res.status(400).json({ error: "Patient ID is required" });
+  }
+
+  try {
+    const provider = new ethers.JsonRpcProvider(providerUrl);
+    const readContract = new ethers.Contract(contractAddress, contractABI, provider);
+
+    const patient = await readContract.patients(pId);
+
+    if (patient.id.toString() === "0") {
+      return res.status(404).json({ error: "Patient not found on blockchain" });
+    }
+
+    let doctorAccess = [];
+    const accounts = await provider.listAccounts();
+    const patientAccount = accounts.find(
+        (acc) => acc.address.toLowerCase() === patient.wallet.toLowerCase()
+    );
+
+    if (patientAccount) {
+        const signer = await provider.getSigner(patientAccount.address);
+        const connectedContract = new ethers.Contract(contractAddress, contractABI, signer);
+        
+        const accessData = await connectedContract.getPatientDoctorAccess(pId);
+        // Clean BigInts
+        doctorAccess = accessData.map((id) => Number(id));
+    }
+
+    res.status(200).json({
+      id: Number(patient.id),
+      name: patient.name,
+      wallet: patient.wallet,
+      doctorAccess: doctorAccess,
+    });
+
+  } catch (error) {
+    res.status(500).json({ error: error.reason || "Error retrieving data" });
+  }
+}
+=== FILE: C:\EHR\frontend\pages\api\getPatientDocuments.js ===
+import { ethers } from 'ethers';
+import { contractAddress, contractABI, providerUrl } from '../../lib/constants';
+
+export default async function handler(req, res) {
+  const { patientId } = req.query;
+
+  // Parse to Integer
+  const pId = parseInt(patientId, 10);
+
+  const provider = new ethers.JsonRpcProvider(providerUrl);
+  const contract = new ethers.Contract(contractAddress, contractABI, provider);
+
+  try {
+    console.log("--- STARTING PATIENT READ METRICS ---");
+    const t_start = performance.now(); // Start Timer
+
+    const patient = await contract.patients(pId);
+    const patientWalletAddress = patient.wallet;
+
+    if (!patientWalletAddress || patient.id == 0) {
+      return res.status(404).json({ error: "Patient not found" });
+    }
+
+    const accounts = await provider.listAccounts();
+    const matchingAccount = accounts.find(
+      (account) => account.address.toLowerCase() === patientWalletAddress.toLowerCase()
+    );
+
+    if (!matchingAccount) {
+      return res.status(403).json({ error: "Patient wallet not found in local node." });
+    }
+
+    const signer = await provider.getSigner(matchingAccount.address);
+    const contractWithSigner = new ethers.Contract(contractAddress, contractABI, signer);
+    const documents = await contractWithSigner.getPatientDocuments(pId);
+
+    const t_end = performance.now(); // End Timer
+    const readLatency = (t_end - t_start).toFixed(2);
+
+    console.log(`[METRIC] Patient Data Fetch Latency: ${readLatency} ms`);
+    console.log("-------------------------------------");
+
+    // Convert BigInts & map fields
+    const serializableDocuments = documents.map(doc => ({
+      patientId: Number(doc.patientId),
+      doctorId: Number(doc.doctorId),
+      docId: doc.docId, // <-- FIXED: Added missing docId
+      cid: doc.cid,
+      diseaseName: doc.diseaseName,
+      description: doc.description,
+      imageCID: doc.imageCID,
+      timestamp: Number(doc.timestamp)
+    }));
+    
+    res.status(200).json(serializableDocuments);
+
+  } catch (error) {
+    res.status(500).json({ error: "Error fetching documents", details: error.message });
+  }
+}
+=== FILE: C:\EHR\frontend\pages\api\loginDoctor.js ===
+import bcrypt from 'bcryptjs';
+import { readDoctorDB } from '../../lib/db-handler';
+
+export default async function handler(req, res) {
+  if (req.method !== 'POST') {
+    return res.status(405).json({ error: 'Method not allowed' });
+  }
+
+  const { doctorId, password } = req.body;
+  const doctorDatabase = readDoctorDB();
+
+  try {
+    const id = parseInt(doctorId, 10);
+    const doctor = doctorDatabase[id];
+
+    // 1. Check if doctor exists
+    if (!doctor) {
+      return res.status(404).json({ error: 'Doctor ID not found.' });
+    }
+
+    // 2. Check if doctor has registered (set a password)
+    if (doctor.passwordHash === null) {
+      return res.status(400).json({ error: 'This doctor has not registered yet. Please register first.' });
+    }
+
+    // 3. Verify Password
+    const isMatch = await bcrypt.compare(password, doctor.passwordHash);
+    if (!isMatch) {
+      return res.status(401).json({ error: 'Invalid password.' });
+    }
+
+    // 4. Success
+    res.status(200).json({ 
+      message: 'Login successful',
+      doctorName: doctor.name,
+      doctorId: id
+    });
+
+  } catch (error) {
+    console.error('Error in loginDoctor:', error);
+    res.status(500).json({ error: 'Login failed.' });
+  }
+}
+=== FILE: C:\EHR\frontend\pages\api\registerPatient.js ===
+import { ethers } from 'ethers';
+import { contractAddress, contractABI, providerUrl, adminPrivateKey } from '../../lib/constants';
+import fs from 'fs';
+import path from 'path';
+
+export default async function handler(req, res) {
+    if (req.method !== "POST") return res.status(405).json({ error: "Method not allowed" });
+
+    const { name, wallet } = req.body;
+
+    try {
+        console.log("--- STARTING PATIENT REGISTRATION METRICS ---");
+        const t_start = performance.now(); // Start Timer
+
+        // 1. Use a dedicated patients.json file next to your db.json
+        const patientsDbPath = path.join(process.cwd(), '..', 'patients.json');
+        
+        let patientsData = [];
+        if (fs.existsSync(patientsDbPath)) {
+            patientsData = JSON.parse(fs.readFileSync(patientsDbPath, 'utf8'));
+        }
+        
+        // Auto-generate the sequential ID based on existing patients
+        const newPatientId = patientsData.length + 1;
+
+        // 2. Connect to Blockchain
+        const provider = new ethers.JsonRpcProvider(providerUrl);
+        const walletSigner = new ethers.Wallet(adminPrivateKey, provider);
+        const contract = new ethers.Contract(contractAddress, contractABI, walletSigner);
+        
+        // 3. Register on Blockchain with the EXACT ID
+        const tx = await contract.registerPatient(newPatientId, name, wallet);
+        const receipt = await tx.wait(); // Get receipt for Gas
+
+        // 4. Save EXACT ID to local patients.json to stay in sync
+        patientsData.push({ id: newPatientId, name, wallet });
+        fs.writeFileSync(patientsDbPath, JSON.stringify(patientsData, null, 2));
+
+        const t_end = performance.now(); // End Timer
+        const latency = (t_end - t_start).toFixed(2);
+
+        // --- GAS COST CALCULATION ---
+        const gasUsed = receipt.gasUsed;
+        const feeData = await provider.getFeeData();
+        const gasPrice = feeData.gasPrice || 1000000000n; // Default 1 Gwei
+        const costWei = gasUsed * gasPrice;
+        const costEth = ethers.formatEther(costWei);
+        const ethPriceUsd = 3000; // Assumed ETH Price for Paper
+        const costUsd = (parseFloat(costEth) * ethPriceUsd).toFixed(4);
+
+        // --- UNIFORM LOGGING ---
+        console.log(`[METRIC] Patient Registration Latency: ${latency} ms`);
+        console.log(`[METRIC] Gas Used: ${gasUsed}`);
+        console.log(`[METRIC] Transaction Cost: ${costEth} ETH ($${costUsd} USD)`);
+        console.log("---------------------------------------------");
+        
+        res.status(200).json({
+            message: "Patient registered successfully",
+            patientId: newPatientId.toString(),
+            txHash: tx.hash,
+            metrics: { 
+                latency, // Sending latency back to frontend
+                gasUsed: gasUsed.toString(), 
+                costUsd 
+            }
+        });
+
+    } catch (error) {
+        console.error("Patient Registration Error:", error);
+        res.status(500).json({ error: "Failed to register patient", details: error.message });
+    }
+}
+=== FILE: C:\EHR\frontend\pages\api\uploadDocument.js ===
+import { create } from 'ipfs-http-client';
+import { ethers } from 'ethers';
+import { contractAddress, contractABI, ipfsHost, ipfsApiPort, ipfsProtocol, providerUrl } from '../../lib/constants';
+
+const connectToIPFS = () => {
+  return create({ host: ipfsHost, port: ipfsApiPort, protocol: ipfsProtocol });
+};
+
+export default async function handler(req, res) {
+  if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
+
+  const { patientId, doctorId, docId, ipfsPayload } = req.body;
+
+  const parsedPatientId = parseInt(patientId, 10);
+  const parsedDoctorId = parseInt(doctorId, 10);
+
+  let t0, t3;
+
+  try {
+    console.log("--- STARTING UPLOAD METRICS COLLECTION ---");
+    t0 = performance.now();
+
+    // 1. Upload Encrypted JSON string to IPFS (Zero plain-text touches network)
+    const ipfsClient = connectToIPFS();
+    const t_ipfs_start = performance.now();
+    const added = await ipfsClient.add(ipfsPayload);
+    const t_ipfs_end = performance.now();
+
+    const imageCID = added.path;
+    const ipfsLatency = (t_ipfs_end - t_ipfs_start).toFixed(2);
+    console.log(`[METRIC] IPFS Upload Latency: ${ipfsLatency} ms`);
+
+    // 2. Connect to Blockchain
+    const provider = new ethers.JsonRpcProvider(providerUrl);
+    const contract = new ethers.Contract(contractAddress, contractABI, provider);
+
+    const doctor = await contract.doctors(parsedDoctorId);
+    const doctorWalletAddress = doctor.wallet;
+
+    if (!doctorWalletAddress || doctor.id == 0) {
+      return res.status(404).json({ error: "Doctor not found" });
+    }
+
+    const accounts = await provider.listAccounts();
+    const matchingAccount = accounts.find(
+      (account) => account.address.toLowerCase() === doctorWalletAddress.toLowerCase()
+    );
+
+    if (!matchingAccount) return res.status(403).json({ error: "Doctor wallet not found locally." });
+
+    const signer = await provider.getSigner(matchingAccount.address);
+    const contractWithSigner = new ethers.Contract(contractAddress, contractABI, signer);
+
+    // 3. Write purely placeholder metadata to the Blockchain (Zero-Knowledge)
+    const t_bc_start = performance.now();
+    const tx = await contractWithSigner.uploadDocument(
+      parsedPatientId,
+      parsedDoctorId,
+      docId,
+      imageCID,
+      "ENCRYPTED",
+      "ENCRYPTED",
+      imageCID
+    );
+    const receipt = await tx.wait();
+    const t_bc_end = performance.now();
+    const blockchainLatency = (t_bc_end - t_bc_start).toFixed(2);
+
+    t3 = performance.now();
+    const totalLatency = (t3 - t0).toFixed(2);
+
+    // 4. Calculate Gas & Costs
+    const gasUsed = receipt.gasUsed;
+    const feeData = await provider.getFeeData();
+    const gasPrice = feeData.gasPrice || 1000000000n;
+    const costEth = ethers.formatEther(gasUsed * gasPrice);
+    const costUsd = (parseFloat(costEth) * 3000).toFixed(4);
+
+    console.log(`[METRIC] Blockchain Write Latency: ${blockchainLatency} ms`);
+    console.log(`[METRIC] Total End-to-End Latency: ${totalLatency} ms`);
+    console.log(`[METRIC] Gas Used: ${gasUsed} | Cost: ${costEth} ETH ($${costUsd} USD)`);
+    console.log("------------------------------------------");
+
+    return res.status(200).json({
+      message: "Document encrypted and uploaded successfully",
+      txHash: tx.hash,
+      imageCID: imageCID,
+      metrics: { ipfsLatency, blockchainLatency, totalLatency, gasUsed: gasUsed.toString(), costUsd }
+    });
+
+  } catch (error) {
+    console.error("Upload Error:", error);
+    return res.status(500).json({ error: "Error uploading document", details: error.message });
+  }
+}
+=== FILE: C:\EHR\frontend\pages\api\validatePatient.js ===
+import { ethers } from "ethers";
+import { contractAddress, contractABI, providerUrl } from '../../lib/constants';
+
+export default async function handler(req, res) {
+  if (req.method !== "POST") return res.status(405).json({ error: "Method not allowed" });
+
+  const { patientId, patientName } = req.body;
+
+  try {
+    const provider = new ethers.JsonRpcProvider(providerUrl);
+    const contract = new ethers.Contract(contractAddress, contractABI, provider);
+
+    // THE FIX: Parse to Integer
+    const id = parseInt(patientId, 10);
+    if (isNaN(id) || id <= 0) {
+      return res.status(400).json({ error: "Invalid Patient ID" });
+    }
+
+    const patient = await contract.patients(id);
+
+    if (Number(patient.id) > 0 && patient.name === patientName) {
+      res.status(200).json({ message: "Login Successful" });
+    } else {
+      res.status(400).json({ error: "Invalid Patient ID or Name" });
+    }
+  } catch (error) {
+    console.error("Error fetching patient data:", error);
+    res.status(500).json({ error: "Error fetching patient data" });
+  }
+}
+=== FILE: C:\EHR\frontend\pages\api\verifyFace.js ===
+import { readDoctorDB } from '../../lib/db-handler';
+import { loadModels, ensureModelsLoaded, bufferToImage, getFaceDescriptor, compareFaces, faceapi } from '../../lib/face-api-server';
+import path from 'path';
+import crypto from 'crypto';
+import fs from 'fs';
+
+// Global flag to load models only once
+let modelsInitialized = false;
+
+export default async function handler(req, res) {
+  if (req.method !== 'POST') {
+    return res.status(405).json({ error: 'Method not allowed' });
+  }
+
+  const { doctorId, referencePhotoUrl, liveImageBase64, livenessToken } = req.body;
+  const LIV_SECRET = process.env.LIVENESS_SECRET || 'dev-secret-change-me';
+  if (!livenessToken) return res.status(403).json({ error: 'Liveness proof missing.', verified: false });
+  try {
+    const [payload, sig] = livenessToken.split('.');
+    const expected = crypto.createHmac('sha256', LIV_SECRET).update(payload).digest('hex');
+    if (sig !== expected) return res.status(403).json({ error: 'Invalid liveness proof.', verified: false });
+    const data = JSON.parse(Buffer.from(payload, 'base64').toString());
+    if (Date.now() - data.ts > 30000) return res.status(403).json({ error: 'Liveness proof expired.', verified: false });
+    if (!data.allDone) return res.status(403).json({ error: 'All liveness challenges (blink, left, right, smile) must be completed.', verified: false });
+  } catch (e) { return res.status(403).json({ error: 'Malformed liveness proof.', verified: false }); }
+  const doctorDatabase = readDoctorDB();
+
+  try {
+    console.log("--- STARTING REAL AI BIOMETRIC VERIFICATION ---");
+    const t_start = performance.now();
+
+    // 1. Basic validation
+    if (!doctorId || !referencePhotoUrl || !liveImageBase64) {
+      return res.status(400).json({ error: 'Missing doctor ID, reference photo, or live image.' });
+    }
+
+    const id = parseInt(doctorId, 10);
+    const doctor = doctorDatabase[id];
+
+    if (!doctor) {
+      return res.status(404).json({ error: 'Doctor not found.' });
+    }
+
+    // 2. Load AI Models (first time only)
+    if (!modelsInitialized) {
+      try {
+        const MODEL_URL = path.join(process.cwd(), 'public', 'models');
+        console.log("[AI] Loading face-api models...");
+        await loadModels(MODEL_URL);
+        modelsInitialized = true;
+      } catch (modelErr) {
+        console.error("[AI ERROR]", modelErr.message);
+        return res.status(500).json({ error: 'Failed to load AI models. Ensure models are in public/models/' });
+      }
+    }
+
+    // 3. Ensure models are ready
+    ensureModelsLoaded();
+
+    // 4. Load Reference Photo from filesystem
+    const refPhotoPath = path.join(process.cwd(), 'public', referencePhotoUrl.replace(/^\//, ''));
+    
+    if (!fs.existsSync(refPhotoPath)) {
+      return res.status(404).json({ error: `Reference photo not found at ${refPhotoPath}` });
+    }
+
+    const refImageBuffer = fs.readFileSync(refPhotoPath);
+    const refImage = bufferToImage(refImageBuffer);
+
+    // 5. Convert Live Image from Base64
+    const base64Data = liveImageBase64.replace(/^data:image\/\w+;base64,/, '');
+    const liveImageBuffer = Buffer.from(base64Data, 'base64');
+    const liveImage = bufferToImage(liveImageBuffer);
+
+    // 6. Compute Face Descriptors
+    console.log(`[AI] Computing descriptor for reference photo...`);
+    const t_refStart = performance.now();
+    
+    const refDetection = await getFaceDescriptor(refImage);
+
+    const t_refEnd = performance.now();
+    const refComputeTime = (t_refEnd - t_refStart).toFixed(2);
+
+    if (!refDetection) {
+      return res.status(400).json({ 
+        error: 'No face detected in reference photo. Admin must update the reference photo.',
+        verified: false
+      });
+    }
+
+    console.log(`[AI] Computing descriptor for live image...`);
+    const t_liveStart = performance.now();
+    
+    const liveDetection = await getFaceDescriptor(liveImage);
+
+    const t_liveEnd = performance.now();
+    const liveComputeTime = (t_liveEnd - t_liveStart).toFixed(2);
+
+    if (!liveDetection) {
+      return res.status(400).json({ 
+        error: 'No face detected in live image. Please position your face clearly.',
+        verified: false
+      });
+    }
+
+    // 7. Compare Descriptors
+    console.log(`[AI] Comparing face descriptors...`);
+    const THRESHOLD = 0.6;
+    const comparison = compareFaces(refDetection.descriptor, liveDetection.descriptor, THRESHOLD);
+
+    const refFaceScore = (refDetection.detection.score * 100).toFixed(2);
+    const liveFaceScore = (liveDetection.detection.score * 100).toFixed(2);
+
+    // 8. Calculate Metrics
+    const t_end = performance.now();
+    const totalLatency = (t_end - t_start).toFixed(2);
+
+    // Log comprehensive metrics
+    console.log(`[METRIC] Reference Face Confidence: ${refFaceScore}%`);
+    console.log(`[METRIC] Live Face Confidence: ${liveFaceScore}%`);
+    console.log(`[METRIC] Reference Descriptor Compute Time: ${refComputeTime} ms`);
+    console.log(`[METRIC] Live Descriptor Compute Time: ${liveComputeTime} ms`);
+    console.log(`[METRIC] Euclidean Distance: ${comparison.distance.toFixed(4)}`);
+    console.log(`[METRIC] Match Threshold: ${THRESHOLD}`);
+    console.log(`[METRIC] Is Match: ${comparison.isMatch}`);
+    console.log(`[METRIC] Match Confidence: ${comparison.confidence}%`);
+    console.log(`[METRIC] Total AI Latency: ${totalLatency} ms`);
+    console.log("----------------------------------------------");
+
+    // 9. Return Result
+    if (comparison.isMatch) {
+      res.status(200).json({ 
+        verified: true, 
+        message: 'Face biometric match successful!',
+        metrics: {
+          euclideanDistance: comparison.distance.toFixed(4),
+          matchConfidence: comparison.confidence,
+          refFaceScore,
+          liveFaceScore,
+          refComputeTime,
+          liveComputeTime,
+          totalLatency
+        }
+      });
+    } else {
+      res.status(400).json({ 
+        verified: false, 
+        error: `Face does not match. Distance: ${comparison.distance.toFixed(4)} (threshold: ${THRESHOLD})`,
+        metrics: {
+          euclideanDistance: comparison.distance.toFixed(4),
+          matchConfidence: comparison.confidence,
+          refFaceScore,
+          liveFaceScore,
+          totalLatency
+        }
+      });
+    }
+
+  } catch (error) {
+    console.error('Error in verifyFace:', error);
+    res.status(500).json({ error: 'Face verification failed.', details: error.message });
+  }
+}
+
+
+=== FILE: C:\EHR\frontend\pages\admin.js ===
+import { useState } from "react";
+import { useRouter } from "next/router";
+
+export default function Admin() {
+  const [message, setMessage] = useState("");
+  const [patientName, setPatientName] = useState("");
+  const [wallet, setWallet] = useState("");
+  const [patientId, setPatientId] = useState(null);
+  const router = useRouter();
+
+  const handleRegisterPatient = async () => {
+    setMessage("Registering...");
+    try {
+        const response = await fetch("/api/registerPatient", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: patientName, wallet }),
+        });
+
+        const data = await response.json();
+        if(response.ok) {
+            setMessage(data.message);
+            setPatientId(data.patientId);
+        } else {
+            setMessage("Error: " + data.error);
+        }
+    } catch (error) {
+        setMessage("Error connecting to server");
+    }
+  };
+
+  return (
+    <div className="min-h-screen bg-gray-100 p-8">
+      <button onClick={() => router.push("/")} className="mb-6 text-blue-600 hover:underline">
+        &larr; Back to Home
+      </button>
+
+      <h1 className="text-3xl font-bold text-center mb-8 text-blue-800">Admin Panel</h1>
+
+      <div className="max-w-xl mx-auto bg-white p-6 rounded-lg shadow-md">
+        <h2 className="text-2xl font-semibold mb-4">Register New Patient</h2>
+        <div className="space-y-4">
+          <input
+            className="w-full p-3 border border-gray-300 rounded"
+            type="text"
+            placeholder="Patient Name"
+            value={patientName}
+            onChange={(e) => setPatientName(e.target.value)}
+          />
+          <input
+            className="w-full p-3 border border-gray-300 rounded"
+            type="text"
+            placeholder="Wallet Address"
+            value={wallet}
+            onChange={(e) => setWallet(e.target.value)}
+          />
+          <button
+            onClick={handleRegisterPatient}
+            className="w-full py-3 bg-blue-600 text-white rounded hover:bg-blue-700"
+          >
+            Register Patient
+          </button>
+        </div>
+
+        {message && <p className="mt-4 text-center font-semibold">{message}</p>}
+        {patientId && (
+          <div className="mt-4 p-4 bg-green-100 text-green-800 rounded text-center">
+            Patient Registered! ID: <strong>{patientId}</strong>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+=== FILE: C:\EHR\frontend\pages\benchmark.js ===
+import { useState } from "react";
+
+export default function Benchmark() {
+  const [iterations, setIterations] = useState(10);
+  const [patientId, setPatientId] = useState("");
+  const [doctorId, setDoctorId] = useState("");
+  const [fileSizeKb, setFileSizeKb] = useState(50);
+  const [status, setStatus] = useState("Idle");
+
+  const runUploadBenchmark = async () => {
+    if (!patientId || !doctorId) {
+      alert("Please enter a valid Patient ID and Doctor ID");
+      return;
+    }
+
+    setStatus(`Running ${iterations} iterations... Please do not close this tab.`);
+    const data = [];
+
+    // Dynamically import crypto libraries for the browser
+    const { encryptDocument } = await import("../lib/crypto/documentEncryption");
+
+    // Generate a dummy file based on the KB size requested
+    const dummyFileBytes = new Uint8Array(1024 * fileSizeKb);
+    const dummyMetadata = { diseaseName: "Benchmark Test", description: `File size: ${fileSizeKb}KB` };
+    const dummyAK = crypto.getRandomValues(new Uint8Array(32)); 
+    const dummyPatientAddress = "0x1234567890123456789012345678901234567890";
+
+    for (let i = 0; i < iterations; i++) {
+      const docId = `bench-${Date.now()}-${i}`;
+      setStatus(`Processing iteration ${i + 1} of ${iterations}...`);
+
+      try {
+        // --- 1. Measure Browser AES-256-GCM Encryption ---
+        const t0_enc = performance.now();
+        const { ipfsPayload } = await encryptDocument({
+          fileBytes: dummyFileBytes,
+          metadata: dummyMetadata,
+          ak: dummyAK,
+          patientAddress: dummyPatientAddress,
+          docId: docId,
+          akVersion: 1
+        });
+        const t1_enc = performance.now();
+        const encLatency = t1_enc - t0_enc;
+
+        // --- 2. Measure IPFS & Blockchain (API) ---
+        const payloadString = JSON.stringify(ipfsPayload);
+        const t0_api = performance.now();
+        
+        const res = await fetch("/api/uploadDocument", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            patientId: parseInt(patientId),
+            doctorId: parseInt(doctorId),
+            docId: docId,
+            ipfsPayload: payloadString
+          }),
+        });
+        
+        const apiData = await res.json();
+        const t1_api = performance.now();
+        const apiLatency = t1_api - t0_api;
+
+        // --- 3. Record Data ---
+        if (res.ok) {
+            // SUCCESS
+            data.push({
+                Iteration: i + 1,
+                Status: "Success",
+                FileSizeKB: fileSizeKb,
+                BrowserEncryption_ms: encLatency.toFixed(2),
+                IPFSUpload_ms: apiData.metrics?.ipfsLatency || 0,
+                BlockchainWrite_ms: apiData.metrics?.blockchainLatency || 0,
+                TotalAPITime_ms: apiLatency.toFixed(2),
+                GasUsed: apiData.metrics?.gasUsed || 0,
+                Cost_USD: apiData.metrics?.costUsd || 0,
+            });
+        } else {
+            // FAILURE (Unauthorized, Node down, etc)
+            data.push({
+                Iteration: i + 1,
+                Status: `Failed: ${apiData.error || 'Unknown Error'}`,
+                FileSizeKB: fileSizeKb,
+                BrowserEncryption_ms: encLatency.toFixed(2),
+                IPFSUpload_ms: 0,
+                BlockchainWrite_ms: 0,
+                TotalAPITime_ms: apiLatency.toFixed(2),
+                GasUsed: 0,
+                Cost_USD: 0,
+            });
+        }
+
+      } catch (err) {
+        console.error(`Iteration ${i} failed:`, err);
+        data.push({
+            Iteration: i + 1,
+            Status: "Crash: " + err.message,
+            FileSizeKB: fileSizeKb,
+            BrowserEncryption_ms: 0, IPFSUpload_ms: 0, BlockchainWrite_ms: 0, 
+            TotalAPITime_ms: 0, GasUsed: 0, Cost_USD: 0
+        });
+      }
+    }
+
+    setStatus("Benchmark Complete! Downloading Excel file...");
+    downloadCSV(data);
+  };
+
+  const downloadCSV = (data) => {
+    if (data.length === 0) return;
+    const headers = Object.keys(data[0]).join(",");
+    const rows = data.map(row => 
+        // Wrap values in quotes to prevent Excel formatting issues
+        Object.values(row).map(val => `"${val}"`).join(",")
+    ).join("\n");
+    
+    const csvContent = "data:text/csv;charset=utf-8," + headers + "\n" + rows;
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement("a");
+    link.setAttribute("href", encodedUri);
+    link.setAttribute("download", `ZKP_EHR_Benchmark_${iterations}_runs.csv`);
+    document.body.appendChild(link);
+    link.click();
+  };
+
+  return (
+    <div className="min-h-screen bg-gray-50 p-10 flex flex-col items-center">
+      <div className="bg-white p-8 rounded shadow-xl max-w-xl w-full">
+        <h1 className="text-3xl font-bold mb-2 text-teal-700 text-center">Research Benchmarking</h1>
+        <p className="text-gray-600 mb-6 text-center text-sm">Measure Latency, Gas, and Crypto Performance</p>
+        
+        <div className="space-y-4 mb-6">
+            <div>
+                <label className="block text-sm font-bold text-gray-700">Patient ID</label>
+                <input type="number" value={patientId} onChange={(e) => setPatientId(e.target.value)} className="p-3 border rounded w-full" placeholder="e.g. 1" />
+            </div>
+            <div>
+                <label className="block text-sm font-bold text-gray-700">Authorized Doctor ID</label>
+                <input type="number" value={doctorId} onChange={(e) => setDoctorId(e.target.value)} className="p-3 border rounded w-full" placeholder="e.g. 2" />
+            </div>
+            <div>
+                <label className="block text-sm font-bold text-gray-700">Number of Iterations</label>
+                <input type="number" value={iterations} onChange={(e) => setIterations(e.target.value)} className="p-3 border rounded w-full bg-blue-50" />
+            </div>
+            <div>
+                <label className="block text-sm font-bold text-gray-700">Test File Size (KB)</label>
+                <input type="number" value={fileSizeKb} onChange={(e) => setFileSizeKb(e.target.value)} className="p-3 border rounded w-full bg-blue-50" />
+            </div>
+        </div>
+        
+        <button 
+          onClick={runUploadBenchmark}
+          className="bg-teal-600 text-white font-bold py-4 px-6 rounded hover:bg-teal-700 w-full shadow-lg transition"
+        >
+          ▶ Start Upload & Encryption Benchmark
+        </button>
+
+        <div className="mt-6 p-4 bg-gray-100 rounded border border-gray-300 text-center font-mono text-sm text-gray-800">
+            {status}
+        </div>
+      </div>
+    </div>
+  );
+}
+=== FILE: C:\EHR\frontend\pages\doctorDashboard.js ===
+import { useState, useEffect } from "react";
+import { useRouter } from "next/router";
+
+export default function DoctorDashboard() {
+  const router = useRouter();
+  const { doctorId, doctorName } = router.query;
+  const [patientId, setPatientId] = useState("");
+
+  return (
+    <div className="min-h-screen bg-gray-50 p-8">
+      <div className="max-w-4xl mx-auto">
+        <div className="flex justify-between items-center mb-8">
+            <h1 className="text-3xl font-bold text-teal-700">Welcome, {doctorName}</h1>
+            <button onClick={() => router.push('/')} className="text-red-500">Logout</button>
+        </div>
+
+        <div className="bg-white p-8 rounded-lg shadow-md">
+          <h2 className="text-xl font-semibold mb-4">Manage Patient Records</h2>
+          <div className="flex gap-4">
+            <input
+              type="number"
+              placeholder="Enter Patient ID"
+              className="flex-1 p-3 border rounded"
+              value={patientId}
+              onChange={(e) => setPatientId(e.target.value)}
+            />
+          </div>
+          <div className="flex gap-4 mt-4">
+            <button
+              onClick={() => router.push({ pathname: "/uploadDocument", query: { doctorId, patientId } })}
+              className="flex-1 bg-teal-600 text-white py-3 rounded hover:bg-teal-700"
+            >
+              Upload Document
+            </button>
+            <button
+              onClick={() => router.push({ pathname: "/getDocument", query: { doctorId, patientId } })}
+              className="flex-1 bg-blue-600 text-white py-3 rounded hover:bg-blue-700"
+            >
+              View Documents
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+=== FILE: C:\EHR\frontend\pages\getDocument.js ===
+import { useState, useEffect } from "react";
+import { useRouter } from "next/router";
+import { ipfsProtocol, ipfsHost, ipfsGatewayPort } from "../lib/constants";
+import { getSignedContract, computeTxMetrics } from "../lib/ethClient";
+import { useKeySession } from "../lib/crypto/keySession";
+
+export default function GetDocuments() {
+  const router = useRouter();
+  const { patientId, doctorId } = router.query;
+  const { session } = useKeySession();
+  const [documents, setDocuments] = useState([]);
+  const [decryptedDocs, setDecryptedDocs] = useState({});
+  const [error, setError] = useState("");
+  const [doctorPrivateKey, setDoctorPrivateKey] = useState("");
+  const isDoctor = !!doctorId;
+
+  const fetchDocs = async () => {
+    if (!patientId || !session) return;
+    setError("");
+
+    const url = isDoctor
+      ? `/api/getDocumentsByDoctor?patientId=${patientId}&doctorId=${doctorId}`
+      : `/api/getPatientDocuments?patientId=${patientId}`;
+
+    try {
+      const res = await fetch(url);
+      if (!res.ok) throw new Error("Unauthorized or Patient Not Found.");
+      const docs = await res.json();
+      setDocuments(docs);
+
+      if (docs.length === 0) return;
+
+      // 1. Get Patient Wallet Address (used as Authenticated Data binding)
+      const pRes = await fetch(`/api/getPatientData?patientId=${patientId}`);
+      const pData = await pRes.json();
+      const patientAddress = pData.wallet;
+
+      // 2. Fetch required key material (AK envelope & DEK envelopes)
+      const envUrl = isDoctor 
+          ? `/api/keyvault/getEnvelope?patientId=${patientId}&role=doctor&doctorId=${doctorId}`
+          : `/api/keyvault/getEnvelope?patientId=${patientId}&role=patient`;
+      
+      const envRes = await fetch(envUrl);
+      if (!envRes.ok) throw new Error("Failed to load key envelopes (Access may be revoked)");
+      const envData = await envRes.json();
+
+      const km = await import("../lib/crypto/keyManagement");
+      const { decryptDocument } = await import("../lib/crypto/documentEncryption");
+      await km.ready();
+
+      // 3. Unwrap the patient's Access Key (AK)
+      let ak;
+      if (session.role === 'patient') {
+         ak = session.ak; // patients already hold their AK in memory
+      } else {
+         ak = km.openAKEnvelope(envData.akEnvelope.sealed, session.publicKeyB64, session.privateKey);
+      }
+
+      // 4. Attempt to decrypt each document locally in browser
+      const decMap = {};
+      for (const doc of docs) {
+         const dekEnvelope = envData.dekEnvelopes[doc.docId];
+         if (!dekEnvelope) {
+            decMap[doc.docId] = { error: "No Document Key found. Access might be revoked or pending." };
+            continue;
+         }
+
+         try {
+            // Fetch raw encrypted JSON from IPFS
+            const ipfsRes = await fetch(`${ipfsProtocol}://${ipfsHost}:${ipfsGatewayPort}/ipfs/${doc.cid}`);
+            if (!ipfsRes.ok) throw new Error("Failed to fetch encrypted payload from IPFS");
+            const ipfsPayload = await ipfsRes.json();
+
+            // Decrypt in browser
+            const t0 = performance.now();
+            const { fileBytes, metadata } = await decryptDocument({
+               ipfsPayload, dekEnvelope, ak, patientAddress, docId: doc.docId
+            });
+            const t1 = performance.now();
+            console.log(`[METRIC] Decryption Latency for doc [${doc.docId}]: ${(t1 - t0).toFixed(2)} ms`);
+
+            // Create temporary browser Blob URL for preview
+            const blobUrl = URL.createObjectURL(new Blob([fileBytes], { type: metadata.mimeType || "image/jpeg" }));
+            decMap[doc.docId] = { blobUrl, metadata };
+         } catch (e) {
+            console.error(`Decryption failed for ${doc.docId}:`, e);
+            decMap[doc.docId] = { error: "Decryption Failed (Invalid key or tampered data)" };
+         }
+      }
+      setDecryptedDocs(decMap);
+
+    } catch (err) {
+      setError(err.message);
+    }
+  };
+
+  useEffect(() => { fetchDocs(); }, [patientId, doctorId, isDoctor, session]);
+
+  const handleDelete = async (docId) => {
+    if (!doctorPrivateKey) { alert("Please enter your ETH private key to delete on-chain."); return; }
+    setError("Deleting...");
+    try {
+      const { provider, contract } = getSignedContract(doctorPrivateKey);
+      const tx = await contract.deleteDocument(parseInt(patientId, 10), docId);
+      const receipt = await tx.wait();
+      const metrics = await computeTxMetrics(provider, receipt);
+      console.log(`[METRIC - Delete] Gas: ${metrics.gasUsed}, Cost: $${metrics.costUsd}`);
+      setError("Document deleted successfully.");
+      fetchDocs();
+    } catch (err) {
+      setError(err.reason || err.message);
+    }
+  };
+
+  if (!session) return <div className="p-8 text-center text-red-600 font-bold">Please log in to load encryption keys.</div>;
+
+  return (
+    <div className="min-h-screen bg-gray-100 p-8">
+      <button onClick={() => router.back()} className="mb-4 text-blue-600 hover:underline">← Back</button>
+      <h1 className="text-3xl font-bold mb-6">Medical Records (Patient {patientId})</h1>
+      {error && <p className="text-red-600 bg-red-100 p-4 rounded font-bold mb-4">{error}</p>}
+      
+      {isDoctor && (
+        <div className="mb-6 p-4 bg-yellow-100 rounded shadow border border-yellow-300">
+          <label className="block text-sm font-bold text-yellow-800 mb-2">ETH Private Key (For Deletion On-Chain Only)</label>
+          <input
+            type="password"
+            placeholder="0x..."
+            className="w-full p-2 border rounded focus:ring-yellow-500"
+            value={doctorPrivateKey}
+            onChange={e => setDoctorPrivateKey(e.target.value)}
+          />
+        </div>
+      )}
+
+      {documents.length === 0 && !error && <p>No documents found.</p>}
+
+      <div className="grid gap-6">
+        {documents.map((doc, i) => {
+          const dec = decryptedDocs[doc.docId];
+          return (
+            <div key={i} className="bg-white p-6 rounded-lg shadow-md flex flex-col md:flex-row gap-6 border-t-4 border-teal-500">
+              <div className="flex-1">
+                {dec?.error ? (
+                  <div className="text-red-700 bg-red-50 p-4 border border-red-200 rounded font-semibold flex items-center h-full">
+                    🔒 {dec.error}
+                  </div>
+                ) : dec?.metadata ? (
+                  <>
+                    <h3 className="text-2xl font-bold text-teal-700">{dec.metadata.diseaseName}</h3>
+                    <p className="text-gray-700 mt-2 text-lg">{dec.metadata.description}</p>
+                    {dec.metadata.fileName && <p className="text-sm text-gray-500 mt-2">File: {dec.metadata.fileName}</p>}
+                  </>
+                ) : (
+                  <div className="flex items-center h-full">
+                    <p className="text-gray-500 font-semibold animate-pulse">Decrypting secure payload...</p>
+                  </div>
+                )}
+                <div className="mt-4 p-3 bg-gray-50 rounded border text-xs text-gray-400 break-all font-mono">
+                  <p>On-Chain CID: {doc.cid}</p>
+                  <p>Document ID: {doc.docId}</p>
+                </div>
+              </div>
+              
+              <div className="w-full md:w-64 h-48 bg-gray-100 rounded-lg overflow-hidden flex items-center justify-center border">
+                {dec?.blobUrl ? (
+                  <img src={dec.blobUrl} alt="Medical Record" className="w-full h-full object-cover" />
+                ) : dec?.error ? (
+                  <span className="text-red-500 text-sm font-bold">Encrypted / No Access</span>
+                ) : (
+                  <span className="text-gray-400">Loading...</span>
+                )}
+              </div>
+              
+              {isDoctor && (
+                <button
+                  onClick={() => handleDelete(doc.docId)}
+                  className="bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded h-fit font-bold transition shadow"
+                >
+                  Delete
+                </button>
+              )}
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+=== FILE: C:\EHR\frontend\pages\giveAccess.js ===
+import { useState } from "react";
+import { useRouter } from "next/router";
+import { getSignedContract, computeTxMetrics } from "../lib/ethClient";
+import { useKeySession } from "../lib/crypto/keySession";
+
+export default function GiveAccess() {
+  const router = useRouter();
+  const { patientId: qPid } = router.query;
+  const [patientId, setPatientId] = useState(qPid || "");
+  const [doctorId, setDoctorId] = useState("");
+  const [patientPrivateKey, setPatientPrivateKey] = useState("");
+  const [message, setMessage] = useState("");
+  const { session } = useKeySession();
+
+  const handleAccess = async (action) => {
+    if (!patientPrivateKey) {
+      setMessage("Please enter your ETH private key to sign the transaction.");
+      return;
+    }
+    if (!session || session.role !== 'patient') {
+      setMessage("Encryption session lost. Please log in to your patient portal again.");
+      return;
+    }
+    setMessage("Processing cryptographic request...");
+
+    const pId = parseInt(patientId, 10);
+    const dId = parseInt(doctorId, 10);
+
+    try {
+      const { provider, contract } = getSignedContract(patientPrivateKey);
+      const km = await import("../lib/crypto/keyManagement");
+      await km.ready();
+
+      if (action === "give") {
+        // 1. Fetch Doctor's public key
+        const pubRes = await fetch(`/api/keyvault/publicKey?identity=doctor:${dId}`);
+        if (!pubRes.ok) throw new Error("Doctor has not registered their encryption keys yet.");
+        const doctorRecord = await pubRes.json();
+        
+        // 2. Seal Patient's AK for the Doctor
+        const t0 = performance.now();
+        const sealed = km.sealAKForViewer(session.ak, doctorRecord.x25519Pub);
+        const t1 = performance.now();
+        console.log(`[METRIC] Wrap AK (Seal) Latency: ${(t1-t0).toFixed(2)} ms`);
+        
+        // 3. Put Envelope in Vault
+        const envRes = await fetch("/api/keyvault/putEnvelope", {
+            method: "POST",
+            headers: {"Content-Type":"application/json"},
+            body: JSON.stringify({
+                type: "ak", patientId: pId, identity: `doctor:${dId}`,
+                sealed, akVersion: session.akVersion
+            })
+        });
+        if (!envRes.ok) throw new Error("Failed to save doctor's Access Key envelope.");
+        
+        // 4. On-Chain Grant
+        const tx = await contract.giveAccess(pId, dId);
+        const receipt = await tx.wait();
+        const metrics = await computeTxMetrics(provider, receipt);
+        console.log(`[METRIC - Grant Access] Gas: ${metrics.gasUsed}, Cost: $${metrics.costUsd}`);
+        setMessage("Access granted successfully!");
+
+      } else if (action === "revoke-soft" || action === "revoke-hard") {
+        
+        if (action === "revoke-soft") {
+            // SOFT REVOKE: Simply delete the envelope from the server. (Doctor can't load keys on next refresh)
+            const t0 = performance.now();
+            const delRes = await fetch("/api/keyvault/deleteEnvelope", {
+                method: "POST",
+                headers: {"Content-Type":"application/json"},
+                body: JSON.stringify({ patientId: pId, identity: `doctor:${dId}` })
+            });
+            if (!delRes.ok) throw new Error("Failed to delete AK envelope (Soft Revoke).");
+            const t1 = performance.now();
+            console.log(`[METRIC] Soft Revocation Latency: ${(t1-t0).toFixed(2)} ms`);
+            
+        } else {
+            // HARD REVOKE: Cryptographically cut the doctor off by rotating the Master Access Key (AK)
+            setMessage("Generating new keys & re-wrapping all documents (Hard Revocation)...");
+            
+            const newAK = km.generateAK();
+            const newAkVersion = session.akVersion + 1;
+            
+            // Fetch all current envelopes and authorized doctors
+            const envRes = await fetch(`/api/keyvault/getEnvelope?patientId=${pId}&role=patient`);
+            const envData = await envRes.json();
+            
+            const doctorAccessList = await contract.getPatientDoctorAccess(pId);
+            // Remaining = everyone except the doctor we are revoking
+            const remainingDoctors = doctorAccessList.map(n => Number(n)).filter(id => id !== dId);
+            
+            const t0 = performance.now();
+            const newAkEnvelopes = {};
+            
+            // Re-seal new AK for Patient themselves
+            newAkEnvelopes[`patient:${pId}`] = {
+                sealed: km.sealAKForViewer(newAK, session.publicKeyB64),
+                akVersion: newAkVersion
+            };
+            
+            // Re-seal new AK for remaining Doctors
+            for (const rDoc of remainingDoctors) {
+                const pubRes = await fetch(`/api/keyvault/publicKey?identity=doctor:${rDoc}`);
+                if (pubRes.ok) {
+                    const docRecord = await pubRes.json();
+                    newAkEnvelopes[`doctor:${rDoc}`] = {
+                        sealed: km.sealAKForViewer(newAK, docRecord.x25519Pub),
+                        akVersion: newAkVersion
+                    };
+                }
+            }
+            
+            // Re-wrap all Document Keys (DEKs) using the new AK
+            const newDekEnvelopes = {};
+            for (const [docId, dekEnv] of Object.entries(envData.dekEnvelopes)) {
+                // Unwrap with OLD AK
+                const rawDEK = await km.unwrapDEK(dekEnv.wrappedDek, dekEnv.nonce, session.ak);
+                // Wrap with NEW AK
+                const { wrappedDek, nonce } = await km.wrapDEK(rawDEK, newAK);
+                newDekEnvelopes[docId] = {
+                    wrappedDek, nonce, cid: dekEnv.cid, akVersion: newAkVersion
+                };
+            }
+            const t1 = performance.now();
+            console.log(`[METRIC] Hard Revocation (Key Rotation) Cryptography Latency: ${(t1-t0).toFixed(2)} ms`);
+            
+            // Submit complete rotation packet to Vault
+            const rotRes = await fetch("/api/keyvault/rotateAK", {
+                method: "POST",
+                headers: {"Content-Type":"application/json"},
+                body: JSON.stringify({ patientId: pId, akEnvelopes: newAkEnvelopes, dekEnvelopes: newDekEnvelopes })
+            });
+            if (!rotRes.ok) throw new Error("Failed to commit rotated keys to vault.");
+            
+            // Update live session
+            session.ak = newAK;
+            session.akVersion = newAkVersion;
+        }
+
+        // Finalize On-Chain (Same for both revocation types)
+        setMessage("Finalizing Revocation on Blockchain...");
+        const tx = await contract.revokeAccess(pId, dId);
+        const receipt = await tx.wait();
+        const metrics = await computeTxMetrics(provider, receipt);
+        
+        console.log(`[METRIC - Revoke Access] Gas: ${metrics.gasUsed}, Cost: $${metrics.costUsd}`);
+        setMessage(`Access revoked successfully (${action === 'revoke-soft' ? 'Soft' : 'Hard'} Revocation)!`);
+      }
+    } catch (err) {
+      setMessage("Error: " + (err.reason || err.message));
+    }
+  };
+
+  return (
+    <div className="min-h-screen flex items-center justify-center bg-gray-50 p-6">
+      <div className="bg-white p-8 rounded shadow-2xl w-full max-w-lg space-y-6">
+        <h2 className="text-3xl font-extrabold text-teal-800 text-center">Manage Access</h2>
+        <div className="space-y-4">
+          <input placeholder="Patient ID" value={patientId} onChange={e=>setPatientId(e.target.value)} className="w-full p-3 border rounded shadow-sm" />
+          <input placeholder="Doctor ID" type="number" value={doctorId} onChange={e=>setDoctorId(e.target.value)} className="w-full p-3 border rounded shadow-sm" />
+          <div className="bg-blue-50 p-4 border border-blue-200 rounded">
+            <label className="block text-xs font-bold text-blue-700 uppercase mb-2">ETH Private Key (For Smart Contract)</label>
+            <input placeholder="0x..." type="password" value={patientPrivateKey} onChange={e=>setPatientPrivateKey(e.target.value)} className="w-full p-2 border rounded" />
+          </div>
+        </div>
+        
+        <button onClick={() => handleAccess("give")} className="w-full bg-teal-600 hover:bg-teal-700 text-white py-3 font-bold rounded shadow transition">
+            Grant Access
+        </button>
+        
+        <div className="flex gap-4">
+          <button onClick={() => handleAccess("revoke-soft")} className="w-full bg-orange-500 hover:bg-orange-600 text-white py-3 font-bold rounded shadow transition text-sm">
+              Soft Revoke (Fast)
+          </button>
+          <button onClick={() => handleAccess("revoke-hard")} className="w-full bg-red-600 hover:bg-red-700 text-white py-3 font-bold rounded shadow transition text-sm">
+              Hard Revoke (Secure Re-key)
+          </button>
+        </div>
+        
+        {message && <p className="text-sm text-center mt-4 p-3 bg-gray-100 border rounded font-semibold">{message}</p>}
+      </div>
+    </div>
+  );
+}
+=== FILE: C:\EHR\frontend\pages\index.js ===
+import { useRouter } from "next/router";
+
+export default function Home() {
+  const router = useRouter();
+
+  return (
+    <div className="min-h-screen flex flex-col items-center justify-center bg-gradient-to-r from-purple-400 via-pink-500 to-yellow-500 text-white py-20 px-6">
+      <div className="text-center mb-16">
+        <h1 className="text-6xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-blue-600 to-teal-200 drop-shadow-md">
+          Medical DApp
+        </h1>
+        <p className="text-xl font-semibold text-gray-100 mt-4">
+          Secure, Patient-Centric Medical Records
+        </p>
+      </div>
+
+      <div className="flex flex-col items-center gap-6 w-full max-w-md">
+        <button
+          className="w-full py-4 text-lg font-semibold bg-blue-800 rounded-lg shadow-xl hover:bg-blue-900 transition transform hover:scale-105"
+          onClick={() => router.push("/admin")}
+        >
+          Admin (Register Patients)
+        </button>
+
+        <button
+          className="w-full py-4 text-lg font-semibold bg-green-700 rounded-lg shadow-xl hover:bg-green-800 transition transform hover:scale-105"
+          onClick={() => router.push("/loginDoctor")}
+        >
+          Doctor Portal (Login/Register)
+        </button>
+
+        <button
+          className="w-full py-4 text-lg font-semibold bg-purple-700 rounded-lg shadow-xl hover:bg-purple-800 transition transform hover:scale-105"
+          onClick={() => router.push("/loginPatient")}
+        >
+          Patient Portal
+        </button>
+      </div>
+    </div>
+  );
+}
+=== FILE: C:\EHR\frontend\pages\loginDoctor.js ===
+import { useState } from "react";
+import { useRouter } from "next/router";
+import { useKeySession } from "../lib/crypto/keySession";
+
+export default function LoginDoctor() {
+  const [doctorId, setDoctorId] = useState("");
+  const [password, setPassword] = useState("");
+  const [passphrase, setPassphrase] = useState("");
+  const [error, setError] = useState("");
+  const [status, setStatus] = useState("");
+  const router = useRouter();
+  const { unlock } = useKeySession();
+
+  const handleLogin = async () => {
+    setError("");
+    if (!passphrase) {
+      setError("Enter your encryption passphrase.");
+      return;
+    }
+    try {
+      setStatus("Checking credentials...");
+      const res = await fetch("/api/loginDoctor", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ doctorId, password }),
+      });
+      const data = await res.json();
+
+      if (data.error) {
+        setError(data.error);
+      } else {
+        setStatus("Unlocking your encryption keys...");
+        await unlock({ role: "doctor", id: data.doctorId, passphrase });
+        setPassphrase("");
+
+        // --- THE FIX: Save to browser memory so it's never lost ---
+        localStorage.setItem("doctorId", data.doctorId);
+        localStorage.setItem("doctorName", data.doctorName);
+        
+        // Redirect to dashboard
+        router.push({
+          pathname: "/doctorDashboard",
+          query: { doctorId: data.doctorId, doctorName: data.doctorName },
+        });
+      }
+    } catch (err) {
+      setError(err.message || "Login failed. Please try again.");
+    } finally {
+      setStatus("");
+    }
+  };
+
+  return (
+    <div className="min-h-screen flex flex-col items-center justify-center bg-gray-50 p-6">
+      <div className="w-full max-w-md bg-white p-8 rounded-lg shadow-xl">
+        <h1 className="text-4xl font-extrabold text-teal-600 mb-6 text-center">Doctor Login</h1>
+        
+        <div className="space-y-4">
+          <input
+            type="number"
+            placeholder="Doctor ID"
+            value={doctorId}
+            onChange={(e) => setDoctorId(e.target.value)}
+            className="w-full p-3 border border-gray-300 rounded-lg"
+          />
+          <input
+            type="password"
+            placeholder="Password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            className="w-full p-3 border border-gray-300 rounded-lg"
+          />
+          <label htmlFor="doctor-passphrase" className="sr-only">Encryption passphrase</label>
+          <input
+            id="doctor-passphrase"
+            type="password"
+            autoComplete="off"
+            placeholder="Encryption passphrase (separate from password)"
+            value={passphrase}
+            onChange={(e) => setPassphrase(e.target.value)}
+            className="w-full p-3 border border-gray-300 rounded-lg"
+          />
+          <p className="text-xs text-gray-500 leading-relaxed">
+            Your first login sets this passphrase. It never leaves your browser and cannot be recovered.
+          </p>
+
+          {error && <p className="text-red-500 text-sm">{error}</p>}
+
+          <button
+            onClick={handleLogin}
+            disabled={Boolean(status)}
+            className="w-full py-3 mt-2 text-white bg-teal-600 rounded-lg hover:bg-teal-700 transition disabled:opacity-60"
+          >
+            {status || "Login"}
+          </button>
+          
+          <div className="text-center mt-4">
+            <p className="text-sm text-gray-600">New Doctor?</p>
+            <button 
+                onClick={() => router.push('/registerDoctor')}
+                className="text-teal-600 font-bold hover:underline"
+            >
+                Register Here
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+=== FILE: C:\EHR\frontend\pages\loginPatient.js ===
+import { useState } from "react";
+import { useRouter } from "next/router";
+import { useKeySession } from "../lib/crypto/keySession";
+
+export default function LoginPatient() {
+  const [patientId, setPatientId] = useState("");
+  const [patientName, setPatientName] = useState("");
+  const [passphrase, setPassphrase] = useState("");
+  const [error, setError] = useState("");
+  const [status, setStatus] = useState("");
+  const router = useRouter();
+  const { unlock } = useKeySession();
+
+  const handleLogin = async () => {
+    setError("");
+    if (!passphrase) {
+      setError("Enter your encryption passphrase.");
+      return;
+    }
+    try {
+      setStatus("Checking patient...");
+      const res = await fetch("/api/validatePatient", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ patientId, patientName }),
+      });
+      const data = await res.json();
+      if (data.error) {
+        setError(data.error);
+        return;
+      }
+
+      setStatus("Unlocking your encryption keys...");
+      await unlock({ role: "patient", id: patientId, passphrase });
+      setPassphrase("");
+
+      router.push({ pathname: "/patientDashboard", query: { patientId, patientName } });
+    } catch (err) {
+      setError(err.message || "Login failed. Please try again.");
+    } finally {
+      setStatus("");
+    }
+  };
+
+  return (
+    <div className="min-h-screen flex flex-col items-center justify-center bg-gray-100 p-6">
+      <div className="w-full max-w-md bg-white p-8 rounded shadow-lg">
+        <h1 className="text-3xl font-bold text-center mb-6">Patient Login</h1>
+        <input className="w-full p-3 border mb-4" placeholder="Patient ID" onChange={(e) => setPatientId(e.target.value)} />
+        <input className="w-full p-3 border mb-4" placeholder="Patient Name" onChange={(e) => setPatientName(e.target.value)} />
+        <label htmlFor="patient-passphrase" className="sr-only">Encryption passphrase</label>
+        <input
+          id="patient-passphrase"
+          type="password"
+          autoComplete="current-password"
+          className="w-full p-3 border mb-2"
+          placeholder="Encryption passphrase"
+          value={passphrase}
+          onChange={(e) => setPassphrase(e.target.value)}
+        />
+        <p className="text-xs text-gray-500 mb-4 leading-relaxed">
+          Your first login sets this passphrase. It never leaves your browser and cannot be recovered, so keep it safe.
+        </p>
+        <button
+          onClick={handleLogin}
+          disabled={Boolean(status)}
+          className="w-full py-3 bg-teal-600 text-white rounded disabled:opacity-60"
+        >
+          {status || "Login"}
+        </button>
+        {error && <p className="text-red-500 mt-4 text-center" role="alert">{error}</p>}
+      </div>
+    </div>
+  );
+}
+=== FILE: C:\EHR\frontend\pages\patientDashboard.js ===
+import { useState, useEffect } from "react";
+import { useRouter } from "next/router";
+
+export default function PatientDashboard() {
+  const router = useRouter();
+  const { patientId } = router.query;
+  const [patientData, setPatientData] = useState(null);
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    if (patientId) {
+      fetch(`/api/getPatientData?patientId=${patientId}`)
+        .then(res => res.json())
+        .then(data => {
+            // FIX: Check if the backend returned an error
+            if (data.error) {
+                setError(data.error); // Show the error message
+            } else {
+                setPatientData(data); // Show the patient data
+            }
+        })
+        .catch(err => setError("Failed to connect to server"));
+    }
+  }, [patientId]);
+
+  // Show Error UI if something is wrong
+  if (error) return (
+    <div className="min-h-screen flex items-center justify-center bg-gray-50">
+        <div className="bg-white p-8 rounded shadow-lg text-center">
+            <h2 className="text-2xl font-bold text-red-600 mb-4">Error Loading Profile</h2>
+            <p className="text-gray-700">{error}</p>
+            <button 
+                onClick={() => router.push('/')}
+                className="mt-6 bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700"
+            >
+                Go Home
+            </button>
+        </div>
+    </div>
+  );
+
+  if (!patientData) return <div className="p-8 text-center text-xl">Loading patient profile...</div>;
+
+  return (
+    <div className="min-h-screen bg-gray-50 p-8">
+       <div className="max-w-4xl mx-auto">
+        <h1 className="text-3xl font-bold mb-6 text-teal-700">Patient Dashboard</h1>
+        
+        <div className="bg-white p-6 rounded shadow mb-6">
+            <h2 className="text-xl font-semibold">Hello, {patientData.name}</h2>
+            <p className="text-gray-700 mt-2">Patient ID: <span className="font-mono bg-gray-100 px-2 py-1 rounded">{patientData.id}</span></p>
+            <p className="text-gray-700 mt-1">Wallet: <span className="font-mono text-sm break-all">{patientData.wallet}</span></p>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <button 
+                onClick={() => router.push({ pathname: "/getDocument", query: { patientId } })}
+                className="bg-blue-600 text-white py-4 rounded shadow hover:bg-blue-700 transition"
+            >
+                View My Medical Records
+            </button>
+            <button 
+                onClick={() => router.push({ pathname: "/giveAccess", query: { patientId } })}
+                className="bg-purple-600 text-white py-4 rounded shadow hover:bg-purple-700 transition"
+            >
+                Manage Doctor Access
+            </button>
+        </div>
+       </div>
+    </div>
+  );
+}
+=== FILE: C:\EHR\frontend\pages\registerDoctor.js ===
+import { useState, useRef, useCallback, useEffect } from "react";
+import Webcam from "react-webcam";
+import { useRouter } from "next/router";
+import * as faceapi from 'face-api.js';
+
+export default function RegisterDoctor() {
+  const router = useRouter();
+  
+  // ------------------------------------------------
+  // STATE MANAGEMENT
+  // ------------------------------------------------
+  const [step, setStep] = useState(1); // 1:Identity, 2:Liveness/Verify, 3:Password
+  
+  // User Data
+  const [doctorId, setDoctorId] = useState("");
+  const [doctorName, setDoctorName] = useState("");
+  const [walletAddress, setWalletAddress] = useState("");
+  const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  
+  // Verification Data
+  const [referencePhoto, setReferencePhoto] = useState("");
+  const [verificationMessage, setVerificationMessage] = useState("");
+  const [livenessStep, setLivenessStep] = useState(0);
+  const [completedSteps, setCompletedSteps] = useState([]);
+  const [spoofWarning, setSpoofWarning] = useState("");
+  
+  // UI Flags
+  const [loading, setLoading] = useState(false);
+  const [modelsLoaded, setModelsLoaded] = useState(false);
+  const [error, setError] = useState("");
+  
+  // Liveness Logic
+  const webcamRef = useRef(null);
+  const isCheckingRef = useRef(false);
+  const [isLive, setIsLive] = useState(false);
+  const [livenessInterval, setLivenessInterval] = useState(null);
+
+  // ------------------------------------------------
+  // 1. LOAD AI MODELS
+  // ------------------------------------------------
+  useEffect(() => {
+    const loadModels = async () => {
+      const MODEL_URL = '/models'; // Matches public/models
+      setVerificationMessage("Loading AI brains...");
+      try {
+        await Promise.all([
+          // Detect faces
+          faceapi.nets.ssdMobilenetv1.loadFromUri(MODEL_URL),
+          // Detect face shape (landmarks)
+          faceapi.nets.faceLandmark68Net.loadFromUri(MODEL_URL),
+          // Recognize/Compare faces
+          faceapi.nets.faceRecognitionNet.loadFromUri(MODEL_URL),
+          // Detect expressions (Smile)
+          faceapi.nets.faceExpressionNet.loadFromUri(MODEL_URL) 
+        ]);
+        setModelsLoaded(true);
+        setVerificationMessage("");
+        console.log("ALL AI Models loaded successfully");
+      } catch (e) {
+        setError("Error loading AI models. Did you download them to public/models?");
+        console.error("Model loading error:", e);
+      }
+    };
+    loadModels();
+
+    // Cleanup interval if user leaves page
+    return () => {
+      if (livenessInterval) clearInterval(livenessInterval);
+    };
+  }, []);
+
+  // ------------------------------------------------
+  // 2. IDENTITY CHECK (Step 1)
+  // ------------------------------------------------
+  const handleCheckIdentity = async (e) => {
+    e.preventDefault();
+    setLoading(true);
+    setError("");
+
+    try {
+      const res = await fetch("/api/checkDoctor", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ doctorId, doctorName }),
+      });
+      const data = await res.json();
+
+      if (!res.ok) throw new Error(data.error);
+
+      // Success
+      setReferencePhoto(data.referencePhotoUrl);
+      setStep(2); // Go to Liveness Check
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // ------------------------------------------------
+  // 3. LIVENESS CHECK (The "Smile" Test) - UPDATED WITH METRICS
+  // ------------------------------------------------
+  const startLivenessCheck = () => {
+    if (!modelsLoaded) return;
+    setError("");
+    setVerificationMessage("ANTI-SPOOF CHECK: Please SMILE at the camera :)");
+    
+    // We check the video stream every 500ms
+    const interval = setInterval(async () => {
+      if (!webcamRef.current || !webcamRef.current.video) return;
+
+      const video = webcamRef.current.video;
+
+      // --- [METRIC START] Start Timer ---
+      const t0 = performance.now();
+
+      // Detect face AND expressions
+      const detections = await faceapi.detectSingleFace(video)
+        .withFaceLandmarks()
+        .withFaceExpressions();
+
+      // --- [METRIC END] Stop Timer ---
+      const t1 = performance.now();
+
+      if (detections) {
+        // 1. Calculate Metrics
+        const inferenceTime = (t1 - t0).toFixed(2); // Time in milliseconds
+        const score = (detections.detection.score * 100).toFixed(2); // Confidence %
+
+        // 2. Log to Console (Check F12 Developer Tools for this data!)
+        console.log(`[v0] LIVENESS - AI Inference Time: ${inferenceTime} ms`);
+        console.log(`[v0] LIVENESS - Face Confidence Score: ${score}%`);
+
+        // 'happy' returns a confidence score (0 to 1)
+        const smileScore = detections.expressions.happy;
+        
+        // Threshold: 0.7 means very likely smiling
+        if (smileScore > 0.7) {
+          clearInterval(interval);
+          setLivenessInterval(null);
+          setIsLive(true);
+          console.log(`[v0] LIVENESS - Smile detected! Score: ${(smileScore * 100).toFixed(2)}%`);
+          setVerificationMessage("Smile Detected! Verifying biometric match...");
+          
+          // IMMEDIATELY proceed to biometric verification
+          verifyBiometrics(video); 
+        }
+      }
+    }, 500);
+
+    setLivenessInterval(interval);
+  };
+
+  // ------------------------------------------------
+  // 4. BIOMETRIC VERIFICATION (Face Match with Backend AI)
+  // ------------------------------------------------
+  const verifyBiometrics = async (videoElement) => {
+    setLoading(true);
+    try {
+      // A. Capture live image from video as Base64
+      const challenges = ['blink','left','right','smile'];
+      const labels = ['Step 1/4: Please BLINK your eyes','Step 2/4: Please TURN YOUR HEAD LEFT','Step 3/4: Please TURN YOUR HEAD RIGHT','Step 4/4: Please SMILE at the camera'];
+      let completedToken = null;
+      let finalFrame = null;
+      for (let step = 0; step < challenges.length; step++) {
+        setLivenessStep(step + 1);
+        setVerificationMessage(labels[step]);
+        let passed = false;
+        while (!passed) {
+          if (isCheckingRef.current) { await new Promise(r => setTimeout(r, 200)); continue; }
+          isCheckingRef.current = true;
+          const c = document.createElement('canvas');
+          c.width = videoElement.videoWidth;
+          c.height = videoElement.videoHeight;
+          const cx = c.getContext('2d');
+          cx.drawImage(videoElement, 0, 0);
+          const frame = c.toDataURL('image/jpeg', 0.85);
+          const r = await fetch('/api/checkLiveness', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ frame, challenge: challenges[step], completedToken }) });
+          const data = await r.json();
+          if (data.token) completedToken = data.token;
+          if (data.pad && data.pad.isReal === false) setSpoofWarning('Spoof / Screen Detected! Please use your real live face.');
+          else setSpoofWarning('');
+          if (data.live) { passed = true; finalFrame = frame; setCompletedSteps(prev => [...new Set([...prev, challenges[step]])]); }
+          isCheckingRef.current = false;
+          await new Promise(r2 => setTimeout(r2, 700));
+        }
+      }
+      setVerificationMessage('Liveness Verified! Proceeding to Photo Biometric Verification...');
+      const liveImageBase64 = finalFrame;
+
+      const res = await fetch("/api/verifyFace", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ 
+          doctorId, 
+          referencePhotoUrl: referencePhoto,
+          liveImageBase64,
+          livenessToken: completedToken,
+        }),
+      });
+
+      const data = await res.json();
+
+      // Log metrics for debugging
+      if (data.metrics) {
+        console.log("[v0] Backend AI Metrics:", data.metrics);
+        console.log(`[v0] Match Confidence: ${data.metrics.matchConfidence}%`);
+        console.log(`[v0] Euclidean Distance: ${data.metrics.euclideanDistance}`);
+      }
+
+      if (!res.ok || !data.verified) {
+        throw new Error(data.error || "Face biometric verification failed.");
+      }
+
+      // Success
+      setVerificationMessage("IDENTITY CONFIRMED. Redirecting...");
+      setTimeout(() => setStep(3), 2000); // Move to Password Step
+
+    } catch (err) {
+      setError(err.message);
+      setVerificationMessage("");
+      setIsLive(false); // Reset liveness
+      // Stop the liveness loop if it was running
+      if (livenessInterval) clearInterval(livenessInterval);
+      setLivenessInterval(null);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // ------------------------------------------------
+  // 5. REGISTRATION (Step 3)
+  // ------------------------------------------------
+  const handleCompleteRegistration = async (e) => {
+    e.preventDefault();
+    if (password !== confirmPassword) {
+      setError("Passwords do not match");
+      return;
+    }
+    if (!walletAddress) {
+        setError("Please provide wallet address");
+        return;
+    }
+
+    setLoading(true);
+    setError("");
+
+    try {
+      const res = await fetch("/api/completeDoctorRegistration", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ doctorId, password, walletAddress }),
+      });
+      const data = await res.json();
+
+      if (!res.ok) throw new Error(data.error);
+
+      alert("Registration Successful!");
+      router.push("/loginDoctor");
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // ------------------------------------------------
+  // UI RENDER
+  // ------------------------------------------------
+  return (
+    <div className="min-h-screen flex flex-col items-center justify-center bg-gray-100 p-6">
+      <div className="w-full max-w-lg bg-white p-8 rounded-lg shadow-2xl">
+        <h1 className="text-2xl font-bold text-center text-teal-700 mb-6">
+            {step === 1 && "Step 1: Identity Lookup"}
+            {step === 2 && "Step 2: Anti-Spoofing Verification"}
+            {step === 3 && "Step 3: Secure Registration"}
+        </h1>
+
+        {/* LIVENESS CHALLENGE BANNER */}
+        {loading && (
+          <div className="mb-4 p-3 rounded bg-blue-50 border border-blue-200 text-center">
+            <div className="font-bold text-blue-700">{verificationMessage}</div>
+            <div className="flex gap-2 justify-center mt-2">
+              {['Blink','Turn Left','Turn Right','Smile'].map((lbl,i) => (
+                <span key={lbl} className={`px-2 py-1 rounded text-xs ${completedSteps.includes(['blink','left','right','smile'][i]) ? 'bg-green-500 text-white' : (livenessStep===i+1 ? 'bg-blue-500 text-white animate-pulse' : 'bg-gray-200 text-gray-600')}`}>{lbl}</span>
+              ))}
+            </div>
+            {spoofWarning && <div className="mt-2 text-red-600 font-semibold">{spoofWarning}</div>}
+          </div>
+        )}
+        {/* ERROR / STATUS MESSAGES */}
+        {error && (
+            <div className="bg-red-100 border-l-4 border-red-500 text-red-700 p-4 mb-4">
+                <p className="font-bold">Error</p>
+                <p>{error}</p>
+            </div>
+        )}
+        {verificationMessage && (
+            <div className="bg-blue-100 border-l-4 border-blue-500 text-blue-700 p-4 mb-4 text-center">
+                <p className="font-bold animate-pulse">{verificationMessage}</p>
+            </div>
+        )}
+
+        {/* --- STEP 1: FORM --- */}
+        {step === 1 && (
+          <form onSubmit={handleCheckIdentity} className="space-y-4">
+            <div>
+                <label className="block text-gray-700 font-bold mb-2">Doctor ID</label>
+                <input
+                  type="number"
+                  className="w-full p-3 border rounded shadow-sm focus:ring-2 focus:ring-teal-500"
+                  value={doctorId}
+                  onChange={(e) => setDoctorId(e.target.value)}
+                  required
+                />
+            </div>
+            <div>
+                <label className="block text-gray-700 font-bold mb-2">Full Name</label>
+                <input
+                  type="text"
+                  className="w-full p-3 border rounded shadow-sm focus:ring-2 focus:ring-teal-500"
+                  value={doctorName}
+                  onChange={(e) => setDoctorName(e.target.value)}
+                  required
+                />
+            </div>
+            <button 
+              disabled={loading} 
+              className="w-full bg-teal-600 text-white py-3 rounded hover:bg-teal-700 font-bold transition duration-200"
+            >
+              {loading ? "Searching..." : "Next"}
+            </button>
+          </form>
+        )}
+
+        {/* --- STEP 2: CAMERA --- */}
+        {step === 2 && (
+          <div className="flex flex-col items-center">
+             {!modelsLoaded ? (
+                 <p className="text-gray-500">Initializing AI Engines...</p>
+             ) : (
+                <>
+                    <div className="relative border-4 border-black rounded-lg overflow-hidden mb-4 bg-black">
+                        <Webcam
+                            audio={false}
+                            ref={webcamRef}
+                            screenshotFormat="image/jpeg"
+                            width={400}
+                            height={300}
+                            videoConstraints={{ facingMode: "user" }}
+                        />
+                        {/* Overlay Guide */}
+                        {!isLive && (
+                            <div className="absolute top-2 right-2 bg-black bg-opacity-70 text-white px-3 py-1 rounded text-xs">
+                                🔴 Not Live
+                            </div>
+                        )}
+                        {isLive && (
+                             <div className="absolute top-2 right-2 bg-green-500 text-white px-3 py-1 rounded text-xs">
+                                🟢 LIVE
+                             </div>
+                        )}
+                    </div>
+
+                    {!livenessInterval && !isLive && (
+                        <button 
+                            onClick={() => verifyBiometrics(webcamRef.current.video)}
+                            className="w-full bg-blue-600 text-white py-3 rounded font-bold hover:bg-blue-700"
+                        >
+                            Start Biometric Verification
+                        </button>
+                    )}
+                    
+                    {livenessInterval && (
+                         <button disabled className="w-full bg-yellow-500 text-white py-3 rounded font-bold cursor-wait">
+                            Running Liveness Challenges...
+                        </button>
+                    )}
+                </>
+             )}
+          </div>
+        )}
+
+        {/* --- STEP 3: PASSWORD --- */}
+        {step === 3 && (
+          <form onSubmit={handleCompleteRegistration} className="space-y-4">
+            <div className="bg-green-50 p-4 rounded border border-green-200">
+                <h3 className="text-green-800 font-bold">Verification Passed</h3>
+                <p className="text-green-700 text-sm">Biometrics match Dr. {doctorName}.</p>
+            </div>
+
+            <div>
+                <label className="block text-gray-700 text-sm font-bold mb-2">Wallet Address</label>
+                <input
+                  type="text"
+                  placeholder="0x..."
+                  className="w-full p-3 border rounded"
+                  value={walletAddress}
+                  onChange={(e) => setWalletAddress(e.target.value)}
+                  required
+                />
+            </div>
+            <div>
+                <label className="block text-gray-700 text-sm font-bold mb-2">Set Password</label>
+                <input
+                  type="password"
+                  className="w-full p-3 border rounded"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  required
+                />
+            </div>
+            <div>
+                <label className="block text-gray-700 text-sm font-bold mb-2">Confirm Password</label>
+                <input
+                  type="password"
+                  className="w-full p-3 border rounded"
+                  value={confirmPassword}
+                  onChange={(e) => setConfirmPassword(e.target.value)}
+                  required
+                />
+            </div>
+            <button disabled={loading} className="w-full bg-green-600 text-white py-3 rounded hover:bg-green-700 font-bold">
+              {loading ? "Registering..." : "Finalize Registration"}
+            </button>
+          </form>
+        )}
+      </div>
+    </div>
+  );
+}
+
+
+
+
+
+
+
+=== FILE: C:\EHR\frontend\pages\uploadDocument.js ===
+import { useState, useEffect } from "react";
+import { useRouter } from "next/router";
+import { useKeySession } from "../lib/crypto/keySession";
+
+export default function UploadDocument() {
+  const router = useRouter();
+  const { session } = useKeySession();
+  const [patientId, setPatientId] = useState("");
+  const [doctorId, setDoctorId] = useState("");
+  const [diseaseName, setDiseaseName] = useState("");
+  const [description, setDescription] = useState("");
+  const [imageFile, setImageFile] = useState(null);
+  const [message, setMessage] = useState("");
+
+  useEffect(() => {
+    const storedDoctorId = localStorage.getItem("doctorId");
+    if (router.isReady) {
+      const urlDoctorId = router.query.doctorId;
+      const urlPatientId = router.query.patientId;
+      if (storedDoctorId) setDoctorId(storedDoctorId);
+      else if (urlDoctorId) setDoctorId(urlDoctorId);
+      if (urlPatientId) setPatientId(urlPatientId);
+    }
+  }, [router.isReady, router.query]);
+
+  const handleImageChange = (e) => setImageFile(e.target.files[0]);
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+
+    if (!session) {
+      setMessage("Error: Encryption session lost. Please log in again.");
+      return;
+    }
+
+    // --- STRICT RULE: ONLY DOCTORS CAN UPLOAD ---
+    if (session.role !== "doctor") {
+      setMessage("Error: Access denied. Only authorized doctors can upload patient records.");
+      return;
+    }
+
+    if (!doctorId) {
+      setMessage("Error: Doctor ID required.");
+      return;
+    }
+
+    if (!imageFile) {
+      setMessage("Please select a file.");
+      return;
+    }
+
+    setMessage("Encrypting and uploading...");
+    const docId = typeof crypto !== "undefined" && crypto.randomUUID
+        ? crypto.randomUUID()
+        : `${Date.now()}-${Math.random().toString(16).slice(2)}`;
+
+    try {
+      // 1. Get Patient Wallet Address (used as Authenticated Data binding)
+      const pRes = await fetch(`/api/getPatientData?patientId=${patientId}`);
+      if (!pRes.ok) throw new Error("Could not fetch patient wallet");
+      const pData = await pRes.json();
+      const patientAddress = pData.wallet;
+
+      // 2. Resolve Access Key (AK) for Encryption
+      let ak, akVersion;
+      const km = await import("../lib/crypto/keyManagement");
+      await km.ready();
+
+      // --- STRICT RULE: Doctor fetches the patient's AK envelope to encrypt the new document ---
+      // If the patient hasn't granted access, this fetch will fail (404/403)
+      const envRes = await fetch(`/api/keyvault/getEnvelope?patientId=${patientId}&role=doctor&doctorId=${doctorId}`);
+      if (!envRes.ok) throw new Error("Access Denied: You have not been granted permission by this patient to upload records.");
+      
+      const envData = await envRes.json();
+      // Doctor decrypts the patient's Access Key in their browser using their private key
+      ak = km.openAKEnvelope(envData.akEnvelope.sealed, session.publicKeyB64, session.privateKey);
+      akVersion = envData.akEnvelope.akVersion;
+
+      // 3. Encrypt File Locally in Browser
+      const reader = new FileReader();
+      reader.onloadend = async () => {
+        try {
+          const fileBytes = new Uint8Array(reader.result);
+          const metadata = { diseaseName, description, fileName: imageFile.name, mimeType: imageFile.type };
+          
+          const { encryptDocument } = await import("../lib/crypto/documentEncryption");
+          
+          const t0 = performance.now();
+          const { ipfsPayload, dekEnvelope } = await encryptDocument({
+             fileBytes, metadata, ak, patientAddress, docId, akVersion
+          });
+          const t1 = performance.now();
+          
+          const payloadString = JSON.stringify(ipfsPayload);
+          
+          console.log(`[METRIC] Browser AES-256-GCM Encryption Latency: ${(t1 - t0).toFixed(2)} ms`);
+          console.log(`[METRIC] Plaintext Size (File): ${fileBytes.length} bytes`);
+          console.log(`[METRIC] Ciphertext JSON Size (Stored on IPFS): ${new Blob([payloadString]).size} bytes`);
+
+          // 4. Upload Encrypted JSON to IPFS & Record to Blockchain
+          const res = await fetch("/api/uploadDocument", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ patientId, doctorId, docId, ipfsPayload: payloadString }),
+          });
+          const data = await res.json();
+          if(!res.ok) throw new Error(data.error);
+
+          // 5. Store DEK Envelope to Key Vault
+          const dekRes = await fetch("/api/keyvault/putEnvelope", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                  type: "dek", patientId, docId,
+                  wrappedDek: dekEnvelope.wrappedDek, nonce: dekEnvelope.nonce,
+                  cid: data.imageCID, akVersion
+              })
+          });
+          if (!dekRes.ok) throw new Error("Failed to save Document Key envelope.");
+          
+          setMessage("Success! Encrypted CID: " + data.imageCID);
+        } catch(err) {
+          setMessage("Encryption/Upload Error: " + err.message);
+        }
+      };
+      reader.readAsArrayBuffer(imageFile);
+
+    } catch (error) {
+      setMessage("Error: " + error.message);
+    }
+  };
+
+  // --- Render logic prevents patients from even seeing the form ---
+  if (session && session.role !== "doctor") {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-100 p-6">
+        <div className="bg-white p-8 rounded shadow-lg max-w-md text-center text-red-600 font-bold">
+          🚫 Access Restricted: Only doctors can upload medical documents.
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="min-h-screen flex items-center justify-center bg-gray-100 p-6">
+      <form onSubmit={handleSubmit} className="bg-white p-8 rounded shadow-lg w-full max-w-md space-y-4">
+        <h2 className="text-2xl font-bold mb-4 text-teal-800">Doctor Portal — Upload Record</h2>
+        <input placeholder="Patient ID" value={patientId} onChange={e=>setPatientId(e.target.value)} className="w-full p-2 border rounded" required />
+        
+        {/* Hidden Doctor ID input, or keep it visible if you need manual entry */}
+        <input placeholder="Doctor ID" value={doctorId} onChange={e=>setDoctorId(e.target.value)} className="w-full p-2 border rounded" required />
+        
+        <input placeholder="Disease Name / Diagnosis" value={diseaseName} onChange={e=>setDiseaseName(e.target.value)} className="w-full p-2 border rounded" required />
+        <textarea placeholder="Clinical Description" value={description} onChange={e=>setDescription(e.target.value)} className="w-full p-2 border rounded" required />
+        <input type="file" onChange={handleImageChange} className="w-full p-2 border rounded bg-gray-50" required />
+        
+        <button type="submit" className="w-full bg-teal-600 hover:bg-teal-700 text-white py-3 font-bold rounded shadow transition">
+          Encrypt & Upload Record
+        </button>
+        
+        {message && (
+          <p className={`text-sm mt-4 p-3 rounded ${message.includes("Error") || message.includes("Denied") ? "bg-red-100 text-red-700" : "bg-green-100 text-green-700"}`}>
+            {message}
+          </p>
+        )}
+      </form>
+    </div>
+  );
+}
+=== FILE: C:\EHR\frontend\pages\_app.js ===
+import '../styles/globals.css'
+import { KeySessionProvider } from '../lib/crypto/keySession'
+
+function MyApp({ Component, pageProps }) {
+  return (
+    <KeySessionProvider>
+      <Component {...pageProps} />
+    </KeySessionProvider>
+  )
+}
+export default MyApp
+=== FILE: C:\EHR\frontend\next.config.js ===
+/** @type {import('next').NextConfig} */
+const nextConfig = {
+  serverExternalPackages: ['@tensorflow/tfjs-node', 'onnxruntime-node', 'sharp', 'canvas'],
+  webpack: (config) => {
+    config.externals = [...(config.externals || []), '@tensorflow/tfjs-node', 'onnxruntime-node', 'sharp', 'canvas'];
+    return config;
+  },
+};
+module.exports = nextConfig;
