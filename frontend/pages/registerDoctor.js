@@ -42,6 +42,12 @@ const NEUTRAL_YAW = [0.85, 1.2];
 const BLINK_MAX_MS = 1300;
 const NEUTRAL_MAX_AGE_MS = 3500;
 const NEUTRAL_MIN_AGE_MS = 150;
+const FACE_LOCK_HOLD_MS = 1200;
+const FACE_LOCK_MIN_SCORE = 0.6;
+const FACE_LOCK_MIN_FRAC = 0.18;
+const FACE_LOCK_MAX_FRAC = 0.65;
+const FACE_LOCK_MAX_JITTER = 0.08;
+const STEP_TRANSITION_BUFFER_MS = 500;
 
 function computeClientMetrics(landmarks, expressions) {
   const pts = landmarks.positions;
@@ -169,7 +175,7 @@ export default function RegisterDoctor() {
     let cancelled = false;
 
     const startSession = async () => {
-      setStatusBanner("Starting secure liveness session...");
+      setStatusBanner("Face locked. Starting secure liveness session...");
       const res = await fetch("/api/startLiveness", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -181,7 +187,7 @@ export default function RegisterDoctor() {
       sessionIdRef.current = data.sessionId;
       challengeOrderRef.current = data.challenges;
       challengeIdxRef.current = 0;
-      stepTimeoutRef.current = data.stepTimeoutMs;
+      stepTimeoutRef.current = data.windowMs;
       stepStartedRef.current = performance.now();
       setChallengeOrder(data.challenges);
       setChallengeIndex(0);
@@ -191,12 +197,10 @@ export default function RegisterDoctor() {
     };
 
     const runDetectionLoop = async () => {
-      try {
-        await startSession();
-      } catch (e) {
-        setError(e.message);
-        return;
-      }
+      // Camera warm-up and face alignment are deliberately client-only. No session, rate-limit
+      // slot, or 10-second clock exists until the face has been stable and ready.
+      setStatusBanner("Starting camera...");
+      setBottomStatus("Allow camera access and choose your camera. The timer has not started.");
 
       // rawCanvas = untouched pixels (sent to server for PAD — MiniFASNet must see real sensor texture).
       // detectCanvas = downscaled + contrast-boosted copy used ONLY for fast client-side landmark tracking.
@@ -224,6 +228,9 @@ export default function RegisterDoctor() {
       let frameCount = 0;
       let networkFailures = 0;
       const MAX_NETWORK_FAILURES = 3;
+      let lockSince = null;
+      let lastLockCenter = null;
+      let transitionUntil = 0;
 
       const resetGestureState = () => {
         startT = null;
@@ -239,20 +246,17 @@ export default function RegisterDoctor() {
         }
 
         try {
-          const challengeId = challengeOrderRef.current[challengeIdxRef.current];
-          if (!challengeId) break;
-          const meta = CHALLENGE_META[challengeId];
-          if (challengeId !== lastChallengeId) {
+          const challengeId = sessionIdRef.current ? challengeOrderRef.current[challengeIdxRef.current] : null;
+          const meta = challengeId ? CHALLENGE_META[challengeId] : null;
+          if (challengeId && challengeId !== lastChallengeId) {
             resetGestureState();
             lastChallengeId = challengeId;
           }
 
-          if (performance.now() - stepStartedRef.current > stepTimeoutRef.current) {
-            setSpoofWarning("Challenge timed out. Starting a new session with new challenges.");
-            await startSession();
-            resetGestureState();
-            lastChallengeId = null;
-            continue;
+          if (challengeId && performance.now() - stepStartedRef.current > stepTimeoutRef.current) {
+            setSpoofWarning("Challenge timed out. Please try again when ready.");
+            setBottomStatus("The liveness session ended. Click Try again to start a fresh session.");
+            break;
           }
 
           const vw = video.videoWidth;
@@ -287,6 +291,46 @@ export default function RegisterDoctor() {
 
           frameCount++;
           const metrics = computeClientMetrics(detection.landmarks, detection.expressions);
+          const box = detection.detection.box;
+          const faceFrac = box.width / dw;
+          const center = { x: (box.x + box.width / 2) / dw, y: (box.y + box.height / 2) / dh };
+          const jitter = lastLockCenter ? Math.hypot(center.x - lastLockCenter.x, center.y - lastLockCenter.y) : 0;
+          lastLockCenter = center;
+
+          if (!challengeId) {
+            const ready = detection.detection.score >= FACE_LOCK_MIN_SCORE &&
+              faceFrac >= FACE_LOCK_MIN_FRAC && faceFrac <= FACE_LOCK_MAX_FRAC &&
+              metrics.yaw >= NEUTRAL_YAW[0] && metrics.yaw <= NEUTRAL_YAW[1] &&
+              metrics.ear >= 0.2 && jitter <= FACE_LOCK_MAX_JITTER;
+            setLiveTelemetry(`Face ${Math.round(detection.detection.score * 100)}% | Yaw ${metrics.yaw.toFixed(2)} | Light check after lock`);
+            if (!ready) {
+              lockSince = null;
+              setFaceLuma(luma);
+              setBottomStatus("Look straight at the camera, keep both eyes open, and hold still.");
+              await nextFrame();
+              continue;
+            }
+            if (lockSince === null) lockSince = performance.now();
+            const progress = Math.min(1, (performance.now() - lockSince) / FACE_LOCK_HOLD_MS);
+            setBottomStatus(progress < 1 ? "Face found — hold still..." : "Face locked. Starting secure session...");
+            if (progress < 1) {
+              await nextFrame();
+              continue;
+            }
+            try {
+              await startSession();
+            } catch (e) {
+              setError(e.message);
+              break;
+            }
+            transitionUntil = performance.now() + STEP_TRANSITION_BUFFER_MS;
+            continue;
+          }
+
+          if (performance.now() < transitionUntil) {
+            await sleep(50);
+            continue;
+          }
 
           if (frameCount % 10 === 1) {
             const b = detection.detection.box;
@@ -406,11 +450,9 @@ export default function RegisterDoctor() {
           if (cancelled) break;
 
           if (data.restart) {
-            setSpoofWarning(data.reason);
-            await sleep(1200);
-            await startSession();
-            lastChallengeId = null;
-            continue;
+            setSpoofWarning(data.reason || "Liveness session ended.");
+            setBottomStatus("Click Try again to start a fresh session when you are ready.");
+            break;
           }
 
           if (!res.ok || !data.passed) {
