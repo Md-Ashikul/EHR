@@ -1,3 +1,4 @@
+import path from 'path';
 import { loadModels, ensureModelsLoaded, bufferToImage, faceapi } from '../../lib/face-api-server';
 import {
   evaluateAntiSpoofing,
@@ -7,11 +8,15 @@ import {
   normalizeForDetection,
   measureFaceBrightness,
 } from '../../lib/liveness-utils';
-
-const ALLOWED_CHALLENGES = ['blink', 'left', 'right', 'smile'];
-const LOW_LIGHT_LUMA = 70;
-import crypto from 'crypto';
-import path from 'path';
+import {
+  getSession,
+  sessionTimeError,
+  failSession,
+  issueProof,
+  frameHash,
+  MAX_FAILURES_PER_STEP,
+  STEP_TIMEOUT_MS,
+} from '../../lib/liveness-session';
 
 export const config = {
   api: {
@@ -21,153 +26,232 @@ export const config = {
   },
 };
 
+const LOW_LIGHT_LUMA = 70;
+const IDENTITY_THRESHOLD = 0.5;
+const MAX_FRAME_BYTES = 3 * 1024 * 1024;
+
+// Each gesture must be proven as a MOVEMENT, so the client sends a short burst:
+//   blink: [eyes open, eyes closed, eyes re-opened]
+//   left/right/smile: [neutral, gesture]
+// Timing windows and allowed head movement between frames for each challenge:
+const BURST_RULES = {
+  blink: { frames: 3, minSpanMs: 40, maxSpanMs: 1500, maxShift: 0.25, sizeRange: [0.85, 1.18] },
+  left: { frames: 2, minSpanMs: 120, maxSpanMs: 4000, maxShift: 0.6, sizeRange: [0.75, 1.33] },
+  right: { frames: 2, minSpanMs: 120, maxSpanMs: 4000, maxShift: 0.6, sizeRange: [0.75, 1.33] },
+  smile: { frames: 2, minSpanMs: 120, maxSpanMs: 4000, maxShift: 0.3, sizeRange: [0.85, 1.18] },
+};
+
+const NEUTRAL_YAW = [0.8, 1.25];
+
+function euclidean(a, b) {
+  let sum = 0;
+  for (let i = 0; i < 128; i++) sum += (a[i] - b[i]) ** 2;
+  return Math.sqrt(sum);
+}
+
+async function analyzeFrame(buf, needExpressions) {
+  const img = bufferToImage(await normalizeForDetection(buf));
+  const base = faceapi.detectSingleFace(img).withFaceLandmarks();
+  const det = needExpressions ? await base.withFaceExpressions().withFaceDescriptor() : await base.withFaceDescriptor();
+  if (!det) return null;
+
+  const box = det.detection.box;
+  // Anti-spoof runs on the ORIGINAL pixels, never the brightened copy
+  const [pad, luma] = await Promise.all([evaluateAntiSpoofing(buf, box), measureFaceBrightness(buf, box)]);
+  return {
+    box: { x: box.x, y: box.y, width: box.width, height: box.height },
+    descriptor: Array.from(det.descriptor),
+    ear: calculateEAR(det.landmarks),
+    yaw: calculateYawRatio(det.landmarks),
+    smile: calculateSmileRatio(det.landmarks),
+    happy: det.expressions?.happy ?? 0,
+    pad,
+    luma,
+  };
+}
+
+function checkGesture(challenge, f) {
+  if (challenge === 'blink') {
+    const [open1, closed, open2] = f;
+    const openMin = Math.min(open1.ear, open2.ear);
+    if (openMin < 0.22) return 'Eyes not clearly open before/after the blink.';
+    if (closed.ear >= 0.29) return 'Blink not deep enough — close your eyes fully.';
+    if (closed.ear > openMin * 0.8) return 'No real eye movement detected — blink naturally.';
+    return null;
+  }
+  const [neutral, gesture] = f;
+  if (challenge === 'left' || challenge === 'right') {
+    if (neutral.yaw < NEUTRAL_YAW[0] || neutral.yaw > NEUTRAL_YAW[1]) return 'Start by facing the camera straight on.';
+    if (challenge === 'left' && gesture.yaw <= 1.35) return 'Turn further toward your LEFT shoulder.';
+    if (challenge === 'right' && gesture.yaw >= 0.74) return 'Turn further toward your RIGHT shoulder.';
+    return null;
+  }
+  if (challenge === 'smile') {
+    if (neutral.happy >= 0.5) return 'Start with a neutral face, then smile.';
+    if (!(gesture.smile > 0.41 || gesture.happy > 0.65)) return 'Smile wider.';
+    if (gesture.smile - neutral.smile < 0.02 && gesture.happy - neutral.happy < 0.4) {
+      return 'No real smile movement detected.';
+    }
+    return null;
+  }
+  return 'Unknown challenge.';
+}
+
+// A swapped photo or cut in a video shows up as the face jumping or changing size between frames.
+function checkFaceContinuity(rule, f) {
+  for (let i = 1; i < f.length; i++) {
+    const a = f[i - 1].box;
+    const b = f[i].box;
+    const avgW = (a.width + b.width) / 2;
+    const shift = Math.hypot(a.x + a.width / 2 - (b.x + b.width / 2), a.y + a.height / 2 - (b.y + b.height / 2)) / avgW;
+    const sizeRatio = b.width / a.width;
+    if (shift > rule.maxShift || sizeRatio < rule.sizeRange[0] || sizeRatio > rule.sizeRange[1]) {
+      return 'Face jumped between frames — keep your head steady and in frame.';
+    }
+  }
+  return null;
+}
+
 export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
 
+  const t0 = performance.now();
   try {
-    const t0 = performance.now();
-    const { frame, challenge, completedToken } = req.body;
-    if (!frame) return res.status(400).json({ live: false, reason: 'no frame' });
-    if (!ALLOWED_CHALLENGES.includes(challenge)) {
-      return res.status(400).json({ live: false, reason: 'invalid challenge', allDone: false, completed: [] });
+    const { sessionId, challenge, frames } = req.body || {};
+    const session = getSession(sessionId);
+    if (!session || session.status !== 'active') {
+      return res.status(200).json({ passed: false, restart: true, reason: 'Liveness session invalid or expired. Restarting.' });
     }
 
-    const MODEL_URL = path.join(process.cwd(), 'public', 'models');
-    await loadModels(MODEL_URL);
+    const timeError = sessionTimeError(session);
+    if (timeError) {
+      failSession(session);
+      return res.status(200).json({ passed: false, restart: true, reason: timeError });
+    }
+
+    const expected = session.challenges[session.step];
+    if (challenge !== expected) {
+      return res.status(400).json({ passed: false, reason: `Out-of-order challenge. Server expects "${expected}".` });
+    }
+
+    const rule = BURST_RULES[challenge];
+    if (!Array.isArray(frames) || frames.length !== rule.frames) {
+      return res.status(400).json({ passed: false, reason: `Expected ${rule.frames} frames for ${challenge}.` });
+    }
+
+    const times = frames.map((fr) => Number(fr?.t));
+    const span = times[times.length - 1] - times[0];
+    const monotonic = times.every((t, i) => Number.isFinite(t) && (i === 0 || t > times[i - 1]));
+    if (!monotonic || span < rule.minSpanMs || span > rule.maxSpanMs) {
+      return registerFailure(res, session, challenge, `Movement timing invalid (${Math.round(span)}ms). Perform the gesture in one smooth motion.`);
+    }
+
+    const buffers = [];
+    const hashes = [];
+    for (const fr of frames) {
+      if (typeof fr?.image !== 'string') return res.status(400).json({ passed: false, reason: 'Malformed frame.' });
+      const buf = Buffer.from(fr.image.replace(/^data:image\/\w+;base64,/, ''), 'base64');
+      if (buf.length === 0 || buf.length > MAX_FRAME_BYTES) {
+        return res.status(400).json({ passed: false, reason: 'Frame too large or empty.' });
+      }
+      const h = frameHash(buf);
+      if (hashes.includes(h) || session.seenFrameHashes.has(h)) {
+        return registerFailure(res, session, challenge, 'Replayed or duplicated frame detected.');
+      }
+      buffers.push(buf);
+      hashes.push(h);
+    }
+    hashes.forEach((h) => session.seenFrameHashes.add(h));
+
+    await loadModels(path.join(process.cwd(), 'public', 'models'));
     ensureModelsLoaded();
 
-    const cleanBase64 = frame.replace(/^data:image\/\w+;base64,/, '');
-    const buf = Buffer.from(cleanBase64, 'base64');
-    const detectBuf = await normalizeForDetection(buf);
-    const img = bufferToImage(detectBuf);
-
-    // FULL 128-D Biometric + 68-Landmark Extraction on EVERY challenge frame (strict 0.50 SSD confidence)
-    const baseTask = faceapi.detectSingleFace(img).withFaceLandmarks();
-    const detection =
-      challenge === 'smile'
-        ? await baseTask.withFaceExpressions().withFaceDescriptor()
-        : await baseTask.withFaceDescriptor();
-
-    if (!detection) {
-      console.log(`[LIVENESS] Step=${challenge.toUpperCase()} | No face detected on server (frame rejected)`);
-      return res.status(200).json({ live: false, reason: 'No face detected. Keep face centered.', allDone: false, completed: [] });
+    // Sequential on purpose: tfjs-node + onnxruntime share the CPU, parallel runs just thrash.
+    const analyzed = [];
+    for (const buf of buffers) {
+      const a = await analyzeFrame(buf, challenge === 'smile');
+      if (!a) return registerFailure(res, session, challenge, 'Face lost during the gesture. Keep your whole face in frame.');
+      analyzed.push(a);
     }
 
-    const box = detection.detection.box;
-    // Gate 1 input: PAD runs on the ORIGINAL pixels, never the normalized copy
-    const [pad, faceLuma] = await Promise.all([evaluateAntiSpoofing(buf, box), measureFaceBrightness(buf, box)]);
-    const landmarks = detection.landmarks;
-    const ear = calculateEAR(landmarks);
-    const yaw = calculateYawRatio(landmarks);
-    const smile = calculateSmileRatio(landmarks);
-    const happy = detection.expressions?.happy ?? 0;
+    const minPad = Math.min(...analyzed.map((a) => a.pad.realScore));
+    const minLuma = Math.min(...analyzed.map((a) => a.luma));
 
-    // Every decision uses server-computed values only — client metrics are never trusted.
-    let passed = false;
-    if (challenge === 'blink') {
-      passed = ear < 0.29;
-    } else if (challenge === 'left') {
-      passed = yaw > 1.35; // Strictly turn toward YOUR LEFT shoulder
-    } else if (challenge === 'right') {
-      passed = yaw < 0.74; // Strictly turn toward YOUR RIGHT shoulder
-    } else if (challenge === 'smile') {
-      passed = smile > 0.41 || happy > 0.65;
-    }
-    const gesturePassed = passed;
-
-    // Gate 1: Dual-Scale ONNX MiniFASNet Anti-Spoofing must pass on EVERY step
-    if (!pad.isReal) {
-      passed = false;
-    }
-
-    const LIV_SECRET = process.env.LIVENESS_SECRET || 'ehr-biometric-liveness-hmac-secret-2026';
-    let completed = [];
-    let anchorDescriptor = null;
-
-    if (completedToken) {
-      try {
-        const [payload, sig] = completedToken.split('.');
-        const expected = crypto.createHmac('sha256', LIV_SECRET).update(payload).digest('hex');
-        if (sig === expected) {
-          const data = JSON.parse(Buffer.from(payload, 'base64').toString());
-          if (Date.now() - data.ts < 180000) {
-            completed = data.completed || [];
-            anchorDescriptor = data.anchorDescriptor || null;
-          }
-        }
-      } catch (e) {}
-    }
-
-    // Gate 2: Strict 128-D Biometric Identity Continuity Across All Steps
-    const currentDesc = Array.from(detection.descriptor);
     let identityDistance = 0;
+    const reference = session.anchorDescriptor || analyzed[0].descriptor;
+    for (const a of analyzed) identityDistance = Math.max(identityDistance, euclidean(reference, a.descriptor));
 
-    if (anchorDescriptor && anchorDescriptor.length === 128) {
-      let sum = 0;
-      for (let i = 0; i < 128; i++) {
-        sum += (currentDesc[i] - anchorDescriptor[i]) ** 2;
-      }
-      identityDistance = Math.sqrt(sum);
+    const padFailed = analyzed.some((a) => !a.pad.isReal);
+    const continuityError = checkFaceContinuity(rule, analyzed);
+    const gestureError = checkGesture(challenge, analyzed);
+    const identityFailed = identityDistance >= IDENTITY_THRESHOLD;
 
-      // If someone swaps faces/photos mid-challenge, reject and wipe progress!
-      if (identityDistance >= 0.50) {
-        console.warn(`[SECURITY ALERT] Identity swap detected at step ${challenge}! Distance=${identityDistance.toFixed(4)}`);
-        return res.status(200).json({
-          live: false,
-          allDone: false,
-          completed: [],
-          token: null,
-          reason: 'Security Alert: Face identity changed mid-challenge! Restarting.',
-        });
-      }
-    } else if (passed) {
-      // Lock the 128-D biometric identity on Step 1 (Blink)
-      anchorDescriptor = currentDesc;
-    }
-
-    if (passed && !completed.includes(challenge)) {
-      completed.push(challenge);
-    }
-
-    const allDone = ['blink', 'left', 'right', 'smile'].every((c) => completed.includes(c));
-
-    let token = completedToken || null;
-    if (passed) {
-      const payloadObj = { ts: Date.now(), completed, anchorDescriptor, allDone };
-      const payload = Buffer.from(JSON.stringify(payloadObj)).toString('base64');
-      const sig = crypto.createHmac('sha256', LIV_SECRET).update(payload).digest('hex');
-      token = `${payload}.${sig}`;
-    }
-
-    const latencyMs = (performance.now() - t0).toFixed(0);
     console.log(
-      `[LIVENESS] Step=${challenge.toUpperCase()} | EAR=${ear.toFixed(3)} | Yaw=${yaw.toFixed(2)} | Smile=${smile.toFixed(2)} | Happy=${happy.toFixed(2)} | FaceLuma=${faceLuma.toFixed(0)} | PAD_Real=${(pad.realScore * 100).toFixed(1)}% (print=${(pad.printSpoofScore * 100).toFixed(1)}% replay=${(pad.replaySpoofScore * 100).toFixed(1)}%) | Gesture=${gesturePassed} | ID_Dist=${identityDistance.toFixed(3)} | Passed=${passed} | Time=${latencyMs}ms | Completed=[${completed.join(',')}]`
+      `[LIVENESS] Doctor=${session.doctorId} Step=${session.step + 1}/4 ${challenge.toUpperCase()} | ` +
+        analyzed
+          .map(
+            (a, i) =>
+              `F${i}[EAR=${a.ear.toFixed(3)} Yaw=${a.yaw.toFixed(2)} Smile=${a.smile.toFixed(2)} Happy=${a.happy.toFixed(2)} PAD=${(a.pad.realScore * 100).toFixed(1)}% Luma=${a.luma.toFixed(0)}]`
+          )
+          .join(' ') +
+        ` | Span=${Math.round(span)}ms | ID_Dist=${identityDistance.toFixed(3)} | PAD_OK=${!padFailed} Continuity_OK=${!continuityError} Gesture_OK=${!gestureError} | ${(performance.now() - t0).toFixed(0)}ms`
     );
 
-    const tooDark = faceLuma < LOW_LIGHT_LUMA;
-    let reason = 'ok';
-    if (!pad.isReal) {
-      reason = tooDark
-        ? `Anti-spoof check failed in low light (Real ${(pad.realScore * 100).toFixed(0)}%, face brightness ${faceLuma.toFixed(0)}/255). Add light in front of your face.`
-        : `Spoof Detected! (Real Score: ${(pad.realScore * 100).toFixed(0)}%)`;
-    } else if (!gesturePassed) {
-      reason = `Server did not confirm ${challenge} — try again${challenge === 'blink' ? ' with a full, deliberate blink' : ''}.`;
+    if (identityFailed) {
+      console.warn(`[SECURITY ALERT] Identity changed during session for doctor ${session.doctorId} (dist=${identityDistance.toFixed(3)})`);
+      failSession(session);
+      return res.status(200).json({ passed: false, restart: true, reason: 'Security Alert: Face identity changed mid-challenge! Restarting.' });
+    }
+
+    if (padFailed) {
+      const reason =
+        minLuma < LOW_LIGHT_LUMA
+          ? `Anti-spoof check failed in low light (Real ${(minPad * 100).toFixed(0)}%, face brightness ${minLuma.toFixed(0)}/255). Add light in front of your face.`
+          : `Spoof Detected! (Real Score: ${(minPad * 100).toFixed(0)}%)`;
+      return registerFailure(res, session, challenge, reason, { spoof: true, minPad, minLuma });
+    }
+    if (continuityError) return registerFailure(res, session, challenge, continuityError);
+    if (gestureError) return registerFailure(res, session, challenge, gestureError);
+
+    if (!session.anchorDescriptor) session.anchorDescriptor = analyzed[0].descriptor;
+    session.completed.push(challenge);
+    session.step += 1;
+    session.stepStartedAt = Date.now();
+    session.stepFailures = 0;
+
+    const allDone = session.step >= session.challenges.length;
+    let proof = null;
+    if (allDone) {
+      // Keep the first (frontal/neutral) frame of the final burst server-side for the face match,
+      // so the client can't substitute a different image afterwards.
+      session.finalFrame = buffers[0];
+      proof = issueProof(session);
+      console.log(`[LIVENESS] Doctor=${session.doctorId} PASSED all challenges [${session.completed.join(', ')}]`);
     }
 
     return res.status(200).json({
-      live: passed,
+      passed: true,
       allDone,
-      completed,
-      ear,
-      yaw,
-      smile,
-      pad,
-      faceLuma,
-      token,
-      reason,
+      completed: session.completed,
+      nextChallenge: allDone ? null : session.challenges[session.step],
+      stepTimeoutMs: STEP_TIMEOUT_MS,
+      proof,
+      minPad,
+      minLuma,
+      reason: 'ok',
     });
   } catch (e) {
     console.error('[checkLiveness CRASH]:', e);
-    return res.status(500).json({ live: false, reason: 'Server error: ' + e.message, allDone: false, completed: [] });
+    return res.status(500).json({ passed: false, reason: 'Server error: ' + e.message });
   }
+}
+
+function registerFailure(res, session, challenge, reason, extra = {}) {
+  session.stepFailures += 1;
+  console.log(`[LIVENESS] Doctor=${session.doctorId} ${challenge.toUpperCase()} rejected (${session.stepFailures}/${MAX_FAILURES_PER_STEP}): ${reason}`);
+  if (session.stepFailures >= MAX_FAILURES_PER_STEP) {
+    failSession(session);
+    return res.status(200).json({ passed: false, restart: true, reason: `${reason} Too many failed attempts — restarting with new challenges.`, ...extra });
+  }
+  return res.status(200).json({ passed: false, completed: session.completed, reason, ...extra });
 }

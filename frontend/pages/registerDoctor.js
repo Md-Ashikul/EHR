@@ -3,12 +3,31 @@ import Webcam from "react-webcam";
 import { useRouter } from "next/router";
 import * as faceapi from "face-api.js";
 
-const CHALLENGES = [
-  { id: "blink", title: "ANTI-SPOOF CHECK (1/4): Please BLINK your eyes", statusText: "Looking for Blink..." },
-  { id: "left", title: "ANTI-SPOOF CHECK (2/4): Please TURN YOUR HEAD LEFT", statusText: "Looking for Left Head Turn..." },
-  { id: "right", title: "ANTI-SPOOF CHECK (3/4): Please TURN YOUR HEAD RIGHT", statusText: "Looking for Right Head Turn..." },
-  { id: "smile", title: "ANTI-SPOOF CHECK (4/4): Please SMILE at the camera :)", statusText: "Looking for Smile..." },
-];
+const CHALLENGE_META = {
+  blink: {
+    label: "Blink",
+    instruction: "Look straight at the camera and BLINK once",
+    statusText: "Looking for a natural blink (open → closed → open)...",
+  },
+  left: {
+    label: "Turn Left",
+    instruction: "Face the camera, then TURN YOUR HEAD LEFT",
+    statusText: "Face forward first, then turn toward your LEFT shoulder...",
+  },
+  right: {
+    label: "Turn Right",
+    instruction: "Face the camera, then TURN YOUR HEAD RIGHT",
+    statusText: "Face forward first, then turn toward your RIGHT shoulder...",
+  },
+  smile: {
+    label: "Smile",
+    instruction: "Keep a neutral face, then SMILE",
+    statusText: "Neutral face first, then smile...",
+  },
+};
+
+const titleFor = (order, idx) =>
+  `ANTI-SPOOF CHECK (${idx + 1}/${order.length}): ${CHALLENGE_META[order[idx]].instruction}`;
 
 const dist = (p1, p2) => Math.hypot(p1.x - p2.x, p1.y - p2.y);
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -17,6 +36,12 @@ const nextFrame = () => new Promise((r) => requestAnimationFrame(() => r()));
 const DETECT_WIDTH = 480;
 const LUMA_SAMPLE = 24;
 const MIN_FACE_LUMA = 80;
+
+// Client thresholds are slightly stricter than the server's so borderline bursts aren't wasted round-trips.
+const NEUTRAL_YAW = [0.85, 1.2];
+const BLINK_MAX_MS = 1300;
+const NEUTRAL_MAX_AGE_MS = 3500;
+const NEUTRAL_MIN_AGE_MS = 150;
 
 function computeClientMetrics(landmarks, expressions) {
   const pts = landmarks.positions;
@@ -48,7 +73,7 @@ export default function RegisterDoctor() {
   const [confirmPassword, setConfirmPassword] = useState("");
 
   // Verification & Liveness State
-  const [referencePhoto, setReferencePhoto] = useState("");
+  const [challengeOrder, setChallengeOrder] = useState([]);
   const [challengeIndex, setChallengeIndex] = useState(0);
   const [completedSteps, setCompletedSteps] = useState([]);
   const [statusBanner, setStatusBanner] = useState("");
@@ -64,8 +89,12 @@ export default function RegisterDoctor() {
 
   // Refs for real-time loop
   const webcamRef = useRef(null);
-  const completedTokenRef = useRef(null);
+  const sessionIdRef = useRef(null);
+  const challengeOrderRef = useRef([]);
   const challengeIdxRef = useRef(0);
+  const stepStartedRef = useRef(0);
+  const stepTimeoutRef = useRef(25000);
+  const registrationTokenRef = useRef(null);
 
   // Camera selection (lets you pick DroidCam / external webcams) + face brightness meter
   const [cameras, setCameras] = useState([]);
@@ -123,11 +152,7 @@ export default function RegisterDoctor() {
       const data = await res.json();
       if (!res.ok) throw new Error(data.error);
 
-      setReferencePhoto(data.referencePhotoUrl);
-      setChallengeIndex(0);
-      challengeIdxRef.current = 0;
-      setCompletedSteps([]);
-      completedTokenRef.current = null;
+      registrationTokenRef.current = null;
       setIsLive(false);
       setStep(2);
     } catch (err) {
@@ -137,24 +162,52 @@ export default function RegisterDoctor() {
     }
   };
 
-  // 3. AUTOMATIC STEP-BY-STEP LIVENESS LOOP WHEN STEP 2 OPENS
+  // 3. SERVER-DRIVEN LIVENESS LOOP WHEN STEP 2 OPENS
   useEffect(() => {
     if (step !== 2 || !modelsLoaded || isLive) return;
 
-    setStatusBanner(CHALLENGES[0].title);
-    setBottomStatus(CHALLENGES[0].statusText);
-
     let cancelled = false;
 
+    const startSession = async () => {
+      setStatusBanner("Starting secure liveness session...");
+      const res = await fetch("/api/startLiveness", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ doctorId, doctorName }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Could not start liveness session.");
+
+      sessionIdRef.current = data.sessionId;
+      challengeOrderRef.current = data.challenges;
+      challengeIdxRef.current = 0;
+      stepTimeoutRef.current = data.stepTimeoutMs;
+      stepStartedRef.current = performance.now();
+      setChallengeOrder(data.challenges);
+      setChallengeIndex(0);
+      setCompletedSteps([]);
+      setStatusBanner(titleFor(data.challenges, 0));
+      setBottomStatus(CHALLENGE_META[data.challenges[0]].statusText);
+    };
+
     const runDetectionLoop = async () => {
+      try {
+        await startSession();
+      } catch (e) {
+        setError(e.message);
+        return;
+      }
+
       // rawCanvas = untouched pixels (sent to server for PAD — MiniFASNet must see real sensor texture).
       // detectCanvas = downscaled + contrast-boosted copy used ONLY for fast client-side landmark tracking.
       const rawCanvas = document.createElement("canvas");
       const rawCtx = rawCanvas.getContext("2d");
       const detectCanvas = document.createElement("canvas");
       const detectCtx = detectCanvas.getContext("2d");
-      const blinkCanvas = document.createElement("canvas");
-      const blinkCtx = blinkCanvas.getContext("2d");
+      const startCanvas = document.createElement("canvas");
+      const startCtx = startCanvas.getContext("2d");
+      const peakCanvas = document.createElement("canvas");
+      const peakCtx = peakCanvas.getContext("2d");
       const lumaCanvas = document.createElement("canvas");
       lumaCanvas.width = LUMA_SAMPLE;
       lumaCanvas.height = LUMA_SAMPLE;
@@ -163,9 +216,18 @@ export default function RegisterDoctor() {
       // Client detection is only a trigger hint; the server re-detects at the strict 0.50 confidence.
       const trackerOptions = new faceapi.SsdMobilenetv1Options({ minConfidence: 0.3 });
 
-      let baselineEar = null;
+      // startT = time of the last "before" frame (eyes open / neutral face) held in startCanvas.
+      let startT = null;
       let blinkDip = null;
+      let baselineEar = null;
+      let lastChallengeId = null;
       let frameCount = 0;
+
+      const resetGestureState = () => {
+        startT = null;
+        blinkDip = null;
+        baselineEar = null;
+      };
 
       while (!cancelled) {
         const video = webcamRef.current?.video;
@@ -175,31 +237,43 @@ export default function RegisterDoctor() {
         }
 
         try {
+          const challengeId = challengeOrderRef.current[challengeIdxRef.current];
+          if (!challengeId) break;
+          const meta = CHALLENGE_META[challengeId];
+          if (challengeId !== lastChallengeId) {
+            resetGestureState();
+            lastChallengeId = challengeId;
+          }
+
+          if (performance.now() - stepStartedRef.current > stepTimeoutRef.current) {
+            setSpoofWarning("Challenge timed out. Starting a new session with new challenges.");
+            await startSession();
+            resetGestureState();
+            lastChallengeId = null;
+            continue;
+          }
+
           const vw = video.videoWidth;
           const vh = video.videoHeight;
           const scale = Math.min(1, DETECT_WIDTH / vw);
           const dw = Math.round(vw * scale);
           const dh = Math.round(vh * scale);
           if (rawCanvas.width !== vw || rawCanvas.height !== vh) {
-            rawCanvas.width = blinkCanvas.width = vw;
-            rawCanvas.height = blinkCanvas.height = vh;
+            rawCanvas.width = startCanvas.width = peakCanvas.width = vw;
+            rawCanvas.height = startCanvas.height = peakCanvas.height = vh;
             detectCanvas.width = dw;
             detectCanvas.height = dh;
           }
 
           rawCtx.drawImage(video, 0, 0, vw, vh);
+          const now = performance.now();
           detectCtx.filter = "contrast(1.25) brightness(1.2)";
           detectCtx.drawImage(rawCanvas, 0, 0, dw, dh);
           detectCtx.filter = "none";
 
-          const currentIdx = challengeIdxRef.current;
-          const currentChallenge = CHALLENGES[currentIdx];
-          if (!currentChallenge) break;
-
           // Expressions net is only needed for the smile step — skipping it roughly halves frame time.
           const baseTask = faceapi.detectSingleFace(detectCanvas, trackerOptions).withFaceLandmarks();
-          const detection =
-            currentChallenge.id === "smile" ? await baseTask.withFaceExpressions() : await baseTask;
+          const detection = challengeId === "smile" ? await baseTask.withFaceExpressions() : await baseTask;
 
           if (cancelled) break;
 
@@ -221,113 +295,132 @@ export default function RegisterDoctor() {
             setFaceLuma(Math.round(sum / (px.length / 4)));
           }
 
-          const scorePct = Math.round(detection.detection.score * 100);
-          const smilePct = Math.round(metrics.happy * 100);
+          const secondsLeft = Math.max(0, Math.ceil((stepTimeoutRef.current - (now - stepStartedRef.current)) / 1000));
           setLiveTelemetry(
             "Face Locked ✓ (" +
-              scorePct +
+              Math.round(detection.detection.score * 100) +
               "%) | EAR: " +
               metrics.ear.toFixed(2) +
-              (baselineEar ? " (open≈" + baselineEar.toFixed(2) + ")" : "") +
               " | Yaw: " +
               metrics.yaw.toFixed(2) +
               " | Smile: " +
-              smilePct +
-              "%"
+              Math.round(metrics.happy * 100) +
+              "% | " +
+              secondsLeft +
+              "s left"
           );
 
-          let sendCanvas = null;
-          if (currentChallenge.id === "blink") {
-            // A blink lasts ~100-300ms, so treat it as an event: open → closed (keep the most-closed
-            // raw frame) → reopened. Only a genuine transition gets sent to the server.
+          // Every gesture is captured as a short burst that proves MOVEMENT, not a single pose.
+          let burst = null;
+          if (challengeId === "blink") {
             if (baselineEar === null) baselineEar = metrics.ear;
-            const closedThreshold = Math.min(0.26, baselineEar * 0.8);
+            const isOpen = metrics.ear >= 0.22 && metrics.ear > baselineEar * 0.9;
+            const closedThreshold = Math.min(0.26, baselineEar * 0.75);
 
             if (!blinkDip) {
-              if (metrics.ear < closedThreshold) {
-                blinkDip = { minEar: metrics.ear, frames: 1 };
-                blinkCtx.drawImage(rawCanvas, 0, 0);
-              } else {
+              if (isOpen) {
+                startCtx.drawImage(rawCanvas, 0, 0);
+                startT = now;
                 baselineEar = baselineEar * 0.9 + metrics.ear * 0.1;
+              } else if (metrics.ear < closedThreshold && startT !== null && now - startT < 400) {
+                blinkDip = { minEar: metrics.ear, t: now };
+                peakCtx.drawImage(rawCanvas, 0, 0);
               }
             } else {
-              blinkDip.frames++;
               if (metrics.ear < blinkDip.minEar) {
-                blinkDip.minEar = metrics.ear;
-                blinkCtx.drawImage(rawCanvas, 0, 0);
+                blinkDip = { minEar: metrics.ear, t: now };
+                peakCtx.drawImage(rawCanvas, 0, 0);
               }
-              const reopened = metrics.ear > baselineEar * 0.9;
-              if (reopened || blinkDip.frames >= 6) {
-                console.log("[v0] Blink captured, min EAR:", blinkDip.minEar.toFixed(3), "baseline:", baselineEar.toFixed(3));
-                sendCanvas = blinkCanvas;
-                blinkDip = null;
+              if (now - startT > BLINK_MAX_MS) {
+                // Eyes stayed shut too long — a natural blink reopens quickly.
+                resetGestureState();
+              } else if (isOpen) {
+                burst = [
+                  { canvas: startCanvas, t: startT },
+                  { canvas: peakCanvas, t: blinkDip.t },
+                  { canvas: rawCanvas, t: now },
+                ];
               }
             }
-          } else if (currentChallenge.id === "left") {
-            if (metrics.yaw > 1.35) sendCanvas = rawCanvas; // Turn toward YOUR LEFT shoulder
-          } else if (currentChallenge.id === "right") {
-            if (metrics.yaw < 0.74) sendCanvas = rawCanvas; // Turn toward YOUR RIGHT shoulder
-          } else if (currentChallenge.id === "smile") {
-            if (metrics.happy > 0.6 || metrics.smile > 0.42) sendCanvas = rawCanvas;
+          } else {
+            const isNeutral =
+              challengeId === "smile"
+                ? metrics.happy < 0.3 && metrics.smile < 0.4
+                : metrics.yaw >= NEUTRAL_YAW[0] && metrics.yaw <= NEUTRAL_YAW[1];
+            const isGesture =
+              challengeId === "left"
+                ? metrics.yaw > 1.38
+                : challengeId === "right"
+                ? metrics.yaw < 0.72
+                : metrics.happy > 0.7 || metrics.smile > 0.42;
+
+            if (isNeutral) {
+              startCtx.drawImage(rawCanvas, 0, 0);
+              startT = now;
+            } else if (isGesture && startT !== null) {
+              const age = now - startT;
+              if (age > NEUTRAL_MAX_AGE_MS) {
+                setBottomStatus("Too slow — face the camera again, then " + meta.label.toLowerCase());
+                startT = null;
+              } else if (age >= NEUTRAL_MIN_AGE_MS) {
+                burst = [
+                  { canvas: startCanvas, t: startT },
+                  { canvas: rawCanvas, t: now },
+                ];
+              }
+            }
           }
 
-          if (!sendCanvas) {
+          if (!burst) {
             await nextFrame();
             continue;
           }
 
-          setBottomStatus("Verifying " + currentChallenge.id.toUpperCase() + " & Anti-Spoofing on server...");
-          const frameBase64 = sendCanvas.toDataURL("image/jpeg", 0.92);
+          const frames = burst.map((f) => ({ image: f.canvas.toDataURL("image/jpeg", 0.92), t: f.t }));
+          resetGestureState();
+          setBottomStatus("Verifying " + meta.label.toUpperCase() + " & Anti-Spoofing on server...");
 
           const res = await fetch("/api/checkLiveness", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              frame: frameBase64,
-              challenge: currentChallenge.id,
-              completedToken: completedTokenRef.current,
-            }),
+            body: JSON.stringify({ sessionId: sessionIdRef.current, challenge: challengeId, frames }),
           });
-
           const data = await res.json();
           if (cancelled) break;
 
-          if (!res.ok) {
+          if (data.restart) {
+            setSpoofWarning(data.reason);
+            await sleep(1200);
+            await startSession();
+            lastChallengeId = null;
+            continue;
+          }
+
+          if (!res.ok || !data.passed) {
             setSpoofWarning(data.reason || "Server error during liveness check");
+            setBottomStatus(meta.statusText);
             await sleep(300);
             continue;
           }
 
-          if (data.pad && !data.pad.isReal) {
-            setSpoofWarning("⚠️ " + data.reason);
-            setBottomStatus(currentChallenge.statusText);
-            await sleep(300);
-            continue;
-          } else {
-            setSpoofWarning(data.live ? "" : data.reason && data.reason !== "ok" ? data.reason : "");
+          setSpoofWarning("");
+          setCompletedSteps(data.completed || []);
+
+          if (data.allDone) {
+            cancelled = true;
+            setIsLive(true);
+            setStatusBanner("✅ Liveness Verified! Matching Face Biometrics...");
+            setBottomStatus("Verifying Face Identity with Reference Photo...");
+            await verifyFinalFaceMatch(data.proof);
+            break;
           }
 
-          if (data.live) {
-            completedTokenRef.current = data.token;
-            setCompletedSteps(data.completed || []);
-
-            if (data.allDone || currentIdx + 1 >= CHALLENGES.length) {
-              cancelled = true;
-              setIsLive(true);
-              setStatusBanner("✅ Liveness Verified! Matching Face Biometrics...");
-              setBottomStatus("Verifying Face Identity with Reference Photo...");
-              await verifyFinalFaceMatch(frameBase64, data.token);
-              break;
-            } else {
-              const nextIdx = currentIdx + 1;
-              challengeIdxRef.current = nextIdx;
-              setChallengeIndex(nextIdx);
-              setStatusBanner(CHALLENGES[nextIdx].title);
-              setBottomStatus(CHALLENGES[nextIdx].statusText);
-            }
-          } else {
-            setBottomStatus(currentChallenge.statusText);
-          }
+          const nextIdx = challengeIdxRef.current + 1;
+          challengeIdxRef.current = nextIdx;
+          stepStartedRef.current = performance.now();
+          setChallengeIndex(nextIdx);
+          setStatusBanner(titleFor(challengeOrderRef.current, nextIdx));
+          setBottomStatus(CHALLENGE_META[challengeOrderRef.current[nextIdx]].statusText);
         } catch (err) {
           console.error("[Liveness Loop Error]:", err);
           await sleep(300);
@@ -342,44 +435,39 @@ export default function RegisterDoctor() {
     return () => {
       cancelled = true;
     };
+    // doctorId/doctorName are fixed once step 2 opens
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [step, modelsLoaded, isLive]);
 
-  // 4. FINAL BIOMETRIC FACE MATCH (/api/verifyFace)
-  const verifyFinalFaceMatch = async (liveImageBase64, livenessToken) => {
+  // 4. FINAL BIOMETRIC FACE MATCH (/api/verifyFace) — server uses its own stored liveness frame
+  const verifyFinalFaceMatch = async (livenessProof) => {
     setLoading(true);
     setError("");
     try {
       const res = await fetch("/api/verifyFace", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          doctorId,
-          referencePhotoUrl: referencePhoto,
-          liveImageBase64,
-          livenessToken,
-        }),
+        body: JSON.stringify({ doctorId, livenessProof }),
       });
 
       const data = await res.json();
 
       if (data.metrics) {
-        console.log("[v0] Backend AI Metrics:", data.metrics);
+        console.log("[Face Match] Backend AI Metrics:", data.metrics);
       }
 
       if (!res.ok || !data.verified) {
         throw new Error(data.error || "Face biometric verification failed.");
       }
 
+      registrationTokenRef.current = data.registrationToken;
       setStatusBanner("🎉 IDENTITY CONFIRMED! Redirecting to Step 3...");
       setBottomStatus("Match Confidence: " + (data.metrics?.matchConfidence || "") + "%");
       setTimeout(() => setStep(3), 1500);
     } catch (err) {
       setError(err.message);
+      // Re-running the effect starts a brand-new session with a new random order.
       setIsLive(false);
-      challengeIdxRef.current = 0;
-      setChallengeIndex(0);
-      setCompletedSteps([]);
-      completedTokenRef.current = null;
     } finally {
       setLoading(false);
     }
@@ -388,6 +476,10 @@ export default function RegisterDoctor() {
   // 5. COMPLETE REGISTRATION (Step 3)
   const handleCompleteRegistration = async (e) => {
     e.preventDefault();
+    if (password.length < 8) {
+      setError("Password must be at least 8 characters");
+      return;
+    }
     if (password !== confirmPassword) {
       setError("Passwords do not match");
       return;
@@ -404,11 +496,17 @@ export default function RegisterDoctor() {
       const res = await fetch("/api/completeDoctorRegistration", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ doctorId, password, walletAddress }),
+        body: JSON.stringify({
+          doctorId,
+          password,
+          walletAddress,
+          registrationToken: registrationTokenRef.current,
+        }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error);
 
+      registrationTokenRef.current = null;
       alert("Registration Successful!");
       router.push("/loginDoctor");
     } catch (err) {
@@ -417,6 +515,8 @@ export default function RegisterDoctor() {
       setLoading(false);
     }
   };
+
+  const currentChallengeId = challengeOrder[challengeIndex];
 
   return (
     <div className="min-h-screen flex flex-col items-center justify-center bg-gray-100 p-6">
@@ -475,10 +575,12 @@ export default function RegisterDoctor() {
               <>
                 {/* Dynamic Blue Banner Above Camera */}
                 <div className="w-full bg-blue-100 border-l-4 border-blue-600 text-blue-800 p-4 mb-3 text-center rounded">
-                  <p className="font-bold text-base">{statusBanner || CHALLENGES[challengeIndex]?.title}</p>
-                  <div className="flex gap-2 justify-center mt-2">
-                    {["Blink", "Turn Left", "Turn Right", "Smile"].map((label, idx) => {
-                      const id = CHALLENGES[idx].id;
+                  <p className="font-bold text-base">
+                    {statusBanner || (currentChallengeId ? titleFor(challengeOrder, challengeIndex) : "")}
+                  </p>
+                  <div className="flex flex-wrap gap-2 justify-center mt-2">
+                    {challengeOrder.map((id, idx) => {
+                      const label = CHALLENGE_META[id].label;
                       const done = completedSteps.includes(id);
                       const active = challengeIndex === idx && !isLive;
                       return (
@@ -545,7 +647,7 @@ export default function RegisterDoctor() {
                   />
                   {!isLive ? (
                     <div className="absolute top-2 right-2 bg-black bg-opacity-75 text-white px-3 py-1 rounded text-xs">
-                      🔴 Step {challengeIndex + 1}/4
+                      🔴 Step {challengeIndex + 1}/{challengeOrder.length || 4}
                     </div>
                   ) : (
                     <div className="absolute top-2 right-2 bg-green-600 text-white px-3 py-1 rounded text-xs font-bold">
@@ -565,7 +667,7 @@ export default function RegisterDoctor() {
                     isLive ? "bg-green-600" : "bg-yellow-500"
                   }`}
                 >
-                  {bottomStatus || CHALLENGES[challengeIndex]?.statusText}
+                  {bottomStatus || (currentChallengeId ? CHALLENGE_META[currentChallengeId].statusText : "")}
                 </div>
               </>
             )}
@@ -595,6 +697,7 @@ export default function RegisterDoctor() {
               <label className="block text-gray-700 text-sm font-bold mb-2">Set Password</label>
               <input
                 type="password"
+                minLength={8}
                 className="w-full p-3 border rounded"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
@@ -605,6 +708,7 @@ export default function RegisterDoctor() {
               <label className="block text-gray-700 text-sm font-bold mb-2">Confirm Password</label>
               <input
                 type="password"
+                minLength={8}
                 className="w-full p-3 border rounded"
                 value={confirmPassword}
                 onChange={(e) => setConfirmPassword(e.target.value)}

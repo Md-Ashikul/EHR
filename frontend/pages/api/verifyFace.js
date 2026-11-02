@@ -9,84 +9,48 @@ import {
   compareFaces,
 } from '../../lib/face-api-server';
 import { normalizeForDetection } from '../../lib/liveness-utils';
+import { consumeProof, issueRegistrationGrant } from '../../lib/liveness-session';
 import path from 'path';
-import crypto from 'crypto';
 import fs from 'fs';
-
-export const config = {
-  api: {
-    bodyParser: {
-      sizeLimit: '10mb',
-    },
-  },
-};
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
-  const { doctorId, referencePhotoUrl, liveImageBase64, livenessToken } = req.body;
-  const LIV_SECRET = process.env.LIVENESS_SECRET || 'ehr-biometric-liveness-hmac-secret-2026';
-
-  if (!livenessToken) {
-    return res.status(403).json({ error: 'Liveness proof missing.', verified: false });
-  }
-
-  let tokenData;
   try {
-    const [payload, sig] = livenessToken.split('.');
-    const expected = crypto.createHmac('sha256', LIV_SECRET).update(payload).digest('hex');
-    if (sig !== expected) {
-      return res.status(403).json({ error: 'Invalid liveness proof signature.', verified: false });
-    }
-    tokenData = JSON.parse(Buffer.from(payload, 'base64').toString());
-    if (Date.now() - tokenData.ts > 60000) {
-      return res.status(403).json({ error: 'Liveness proof expired.', verified: false });
-    }
-    if (!tokenData.allDone || !tokenData.anchorDescriptor) {
-      return res.status(403).json({
-        error: 'All 4 liveness challenges (blink, left, right, smile) and identity lock must be completed.',
-        verified: false,
-      });
-    }
-  } catch (e) {
-    return res.status(403).json({ error: 'Malformed liveness proof.', verified: false });
-  }
+    const { doctorId, livenessProof } = req.body || {};
+    const id = parseInt(doctorId, 10);
+    if (!Number.isInteger(id)) return res.status(400).json({ error: 'Invalid doctor ID.', verified: false });
 
-  const doctorDatabase = readDoctorDB();
+    // Single-use: the proof is burned here even if the match below fails.
+    const { session, error: proofError } = consumeProof(livenessProof, id);
+    if (proofError) return res.status(403).json({ error: proofError, verified: false });
 
-  try {
+    const doctor = readDoctorDB()[id];
+    if (!doctor) return res.status(404).json({ error: 'Doctor not found.', verified: false });
+    if (doctor.passwordHash !== null) {
+      return res.status(400).json({ error: 'This doctor has already completed registration.', verified: false });
+    }
+
     console.log('--- STARTING REAL AI BIOMETRIC VERIFICATION ---');
     const t_start = performance.now();
 
-    if (!doctorId || !referencePhotoUrl || !liveImageBase64) {
-      return res.status(400).json({ error: 'Missing doctor ID, reference photo, or live image.' });
-    }
-
-    const id = parseInt(doctorId, 10);
-    const doctor = doctorDatabase[id];
-    if (!doctor) {
-      return res.status(404).json({ error: 'Doctor not found.' });
-    }
-
-    const MODEL_URL = path.join(process.cwd(), 'public', 'models');
-    await loadModels(MODEL_URL);
+    await loadModels(path.join(process.cwd(), 'public', 'models'));
     ensureModelsLoaded();
 
-    const refPhotoPath = path.join(process.cwd(), 'public', referencePhotoUrl.replace(/^\//, ''));
-    if (!fs.existsSync(refPhotoPath)) {
-      return res.status(404).json({ error: `Reference photo not found at ${refPhotoPath}` });
+    // Reference photo path comes from the DB, never from the client, and must stay inside /public.
+    const publicDir = path.join(process.cwd(), 'public');
+    const refPhotoPath = path.resolve(publicDir, String(doctor.referencePhotoUrl || '').replace(/^\//, ''));
+    if (!refPhotoPath.startsWith(publicDir + path.sep) || !fs.existsSync(refPhotoPath)) {
+      return res.status(404).json({ error: 'Reference photo not found for this doctor.', verified: false });
     }
 
-    // 1. Compute (or retrieve cached) Reference Photo Descriptor
     const t_refStart = performance.now();
     let refDetection = getCachedRefDescriptor(refPhotoPath);
     if (!refDetection) {
       console.log('[AI] Computing descriptor for reference photo...');
-      const refImageBuffer = fs.readFileSync(refPhotoPath);
-      const refImage = bufferToImage(refImageBuffer);
-      refDetection = await getFaceDescriptor(refImage);
+      refDetection = await getFaceDescriptor(bufferToImage(fs.readFileSync(refPhotoPath)));
       if (refDetection) setCachedRefDescriptor(refPhotoPath, refDetection);
     } else {
       console.log('[AI] Using cached reference photo descriptor (0ms)...');
@@ -100,26 +64,17 @@ export default async function handler(req, res) {
       });
     }
 
-    // 2. Compute Live Image Descriptor
-    console.log('[AI] Computing descriptor for live image...');
+    // Live frame is the one the server stored during the liveness session — the client can't swap it.
+    console.log('[AI] Computing descriptor for server-held liveness frame...');
     const t_liveStart = performance.now();
-    const base64Data = liveImageBase64.replace(/^data:image\/\w+;base64,/, '');
-    const liveImageBuffer = Buffer.from(base64Data, 'base64');
-    // Same preprocessing as /api/checkLiveness so the anchor descriptor and this one are comparable
-    const liveImage = bufferToImage(await normalizeForDetection(liveImageBuffer));
-    const liveDetection = await getFaceDescriptor(liveImage);
+    const liveDetection = await getFaceDescriptor(bufferToImage(await normalizeForDetection(session.finalFrame)));
     const liveComputeTime = (performance.now() - t_liveStart).toFixed(2);
 
     if (!liveDetection) {
-      return res.status(400).json({
-        error: 'No face detected in live image. Please position your face clearly.',
-        verified: false,
-      });
+      return res.status(400).json({ error: 'No face detected in liveness frame. Please retry.', verified: false });
     }
 
-    // 3. Verify Cryptographic Binding Between Liveness Session Face & Final Verification Face
-    const anchorFloat32 = new Float32Array(tokenData.anchorDescriptor);
-    const livenessSessionBinding = compareFaces(anchorFloat32, liveDetection.descriptor, 0.50);
+    const livenessSessionBinding = compareFaces(new Float32Array(session.anchorDescriptor), liveDetection.descriptor, 0.5);
     if (!livenessSessionBinding.isMatch) {
       return res.status(403).json({
         verified: false,
@@ -127,7 +82,6 @@ export default async function handler(req, res) {
       });
     }
 
-    // 4. Compare Live Descriptor Against Doctor's Enrolled Reference Photo
     const THRESHOLD = 0.6;
     const comparison = compareFaces(refDetection.descriptor, liveDetection.descriptor, THRESHOLD);
 
@@ -147,36 +101,33 @@ export default async function handler(req, res) {
     console.log(`[METRIC] Total AI Latency: ${totalLatency} ms`);
     console.log('----------------------------------------------');
 
-    if (comparison.isMatch) {
-      return res.status(200).json({
-        verified: true,
-        message: 'Face biometric match successful!',
-        metrics: {
-          euclideanDistance: comparison.distance.toFixed(4),
-          livenessBindingDistance: livenessSessionBinding.distance.toFixed(4),
-          matchConfidence: comparison.confidence,
-          refFaceScore,
-          liveFaceScore,
-          refComputeTime,
-          liveComputeTime,
-          totalLatency,
-        },
-      });
-    } else {
+    const metrics = {
+      euclideanDistance: comparison.distance.toFixed(4),
+      livenessBindingDistance: livenessSessionBinding.distance.toFixed(4),
+      matchConfidence: comparison.confidence,
+      refFaceScore,
+      liveFaceScore,
+      refComputeTime,
+      liveComputeTime,
+      totalLatency,
+    };
+
+    if (!comparison.isMatch) {
       return res.status(400).json({
         verified: false,
         error: `Face does not match. Distance: ${comparison.distance.toFixed(4)} (threshold: ${THRESHOLD})`,
-        metrics: {
-          euclideanDistance: comparison.distance.toFixed(4),
-          matchConfidence: comparison.confidence,
-          refFaceScore,
-          liveFaceScore,
-          totalLatency,
-        },
+        metrics,
       });
     }
+
+    return res.status(200).json({
+      verified: true,
+      message: 'Face biometric match successful!',
+      registrationToken: issueRegistrationGrant(id),
+      metrics,
+    });
   } catch (error) {
     console.error('Error in verifyFace:', error);
-    return res.status(500).json({ error: 'Face verification failed.', details: error.message });
+    return res.status(500).json({ error: 'Face verification failed.', details: error.message, verified: false });
   }
 }

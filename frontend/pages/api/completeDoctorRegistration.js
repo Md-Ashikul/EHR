@@ -1,6 +1,7 @@
 import { ethers } from 'ethers';
 import bcrypt from 'bcryptjs';
 import { readDoctorDB, writeDoctorDB } from '../../lib/db-handler';
+import { takeRegistrationGrant } from '../../lib/liveness-session';
 import { 
   contractAddress, 
   contractABI, 
@@ -13,11 +14,13 @@ export default async function handler(req, res) {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
-  const { doctorId, password, walletAddress } = req.body;
+  const { doctorId, password, walletAddress, registrationToken } = req.body;
   const doctorDatabase = readDoctorDB();
 
   let id;
   let doctor;
+  let grantRestore = null;
+  let registered = false;
 
   try {
     console.log("--- STARTING DOCTOR REGISTRATION ---");
@@ -33,6 +36,19 @@ export default async function handler(req, res) {
     if (doctor.passwordHash !== null) {
       return res.status(400).json({ error: 'Doctor already registered.' });
     }
+    if (typeof password !== 'string' || password.length < 8) {
+      return res.status(400).json({ error: 'Password must be at least 8 characters.' });
+    }
+    if (typeof walletAddress !== 'string' || !ethers.isAddress(walletAddress)) {
+      return res.status(400).json({ error: 'Invalid wallet address.' });
+    }
+
+    // Registration is only allowed with a single-use grant issued by a successful liveness + face match.
+    const { error: grantError, restore } = takeRegistrationGrant(registrationToken, id);
+    if (grantError) {
+      return res.status(403).json({ error: grantError });
+    }
+    grantRestore = restore;
 
     // 2. Hash Password (DO NOT SAVE TO DB YET)
     const salt = await bcrypt.genSalt(10);
@@ -64,6 +80,7 @@ export default async function handler(req, res) {
     doctorDatabase[id].passwordHash = hashedPassword;
     doctorDatabase[id].wallet = walletAddress; 
     writeDoctorDB(doctorDatabase);
+    registered = true;
 
     // --- METRICS CALCULATION ---
     const t_end = performance.now();
@@ -99,6 +116,9 @@ export default async function handler(req, res) {
 
   } catch (error) {
     console.error("Doctor Registration Error:", error);
+    // Infrastructure failure (e.g. blockchain down) shouldn't force the doctor to redo liveness;
+    // the grant keeps its original expiry.
+    if (!registered && grantRestore) grantRestore();
     res.status(500).json({ error: "Failed to register doctor", details: error.message });
   }
 }
