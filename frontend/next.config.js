@@ -1,6 +1,6 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  serverExternalPackages: ['@tensorflow/tfjs-node', 'onnxruntime-node', 'sharp', 'canvas'],
+  serverExternalPackages: ['@vladmandic/face-api', '@tensorflow/tfjs-node', 'onnxruntime-node', 'sharp', 'canvas'],
   webpack: (config, { isServer }) => {
     if (!isServer) {
       config.resolve.fallback = {
@@ -12,6 +12,7 @@ const nextConfig = {
     } else {
       config.externals = [
         ...(config.externals || []),
+        '@vladmandic/face-api',
         '@tensorflow/tfjs-node',
         'onnxruntime-node',
         'sharp',

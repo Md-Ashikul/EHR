@@ -9,10 +9,12 @@
     "lint": "next lint"
   },
   "dependencies": {
+    "@tensorflow/tfjs-core": "4.22.0",
+    "@tensorflow/tfjs-node": "4.22.0",
+    "@vladmandic/face-api": "^1.7.15",
     "bcryptjs": "^2.4.3",
     "canvas": "^3.2.3",
     "ethers": "^6.13.5",
-    "face-api.js": "^0.22.2",
     "ipfs-http-client": "^60.0.1",
     "libsodium-wrappers-sumo": "^0.8.4",
     "next": "15.1.7",

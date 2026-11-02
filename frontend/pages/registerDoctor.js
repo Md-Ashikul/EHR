@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect } from "react";
 import Webcam from "react-webcam";
 import { useRouter } from "next/router";
-import * as faceapi from "face-api.js";
+import * as faceapi from "@vladmandic/face-api";
 
 const CHALLENGE_META = {
   blink: {
@@ -222,6 +222,8 @@ export default function RegisterDoctor() {
       let baselineEar = null;
       let lastChallengeId = null;
       let frameCount = 0;
+      let networkFailures = 0;
+      const MAX_NETWORK_FAILURES = 3;
 
       const resetGestureState = () => {
         startT = null;
@@ -380,12 +382,27 @@ export default function RegisterDoctor() {
           resetGestureState();
           setBottomStatus("Verifying " + meta.label.toUpperCase() + " & Anti-Spoofing on server...");
 
-          const res = await fetch("/api/checkLiveness", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ sessionId: sessionIdRef.current, challenge: challengeId, frames }),
-          });
-          const data = await res.json();
+          let res;
+          let data;
+          try {
+            res = await fetch("/api/checkLiveness", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ sessionId: sessionIdRef.current, challenge: challengeId, frames }),
+            });
+            data = await res.json().catch(() => ({ passed: false, reason: `Server returned ${res.status}` }));
+          } catch (networkErr) {
+            networkFailures++;
+            if (networkFailures >= MAX_NETWORK_FAILURES) {
+              setSpoofWarning("Cannot reach the verification server. Check the server console, then reload the page.");
+              setBottomStatus("Liveness check stopped.");
+              break;
+            }
+            setSpoofWarning("Connection to server lost — retrying...");
+            await sleep(1000 * networkFailures);
+            continue;
+          }
+          networkFailures = 0;
           if (cancelled) break;
 
           if (data.restart) {

@@ -1,16 +1,9 @@
 // Server-side face-api helper for Node.js environment
-import { createRequire } from 'module';
-const require = createRequire(import.meta.url);
-
-// 1. Activate Native C++ TensorFlow Backend (100x faster than pure JS, 0% accuracy change)
-try {
-  require('@tensorflow/tfjs-node');
-  console.log('[TensorFlow] Native C++ tfjs-node backend activated!');
-} catch (err) {
-  console.warn('[TensorFlow] Native tfjs-node failed to load, falling back to CPU:', err.message);
-}
-
-import * as faceapi from 'face-api.js';
+// @vladmandic/face-api's Node build loads @tensorflow/tfjs-node itself and shares ONE tfjs-core with it.
+// Never require('@tensorflow/tfjs-node') separately here: a second tfjs-core copy splits the kernel
+// registry and face-api ops (e.g. softmax in the expression net) end up "not yet implemented".
+import './node-util-shim';
+import * as faceapi from '@vladmandic/face-api';
 import { Canvas, Image } from 'canvas';
 import fetch from 'node-fetch';
 
@@ -30,7 +23,8 @@ export async function loadModels(modelPath) {
 
   globalState.loadingPromise = (async () => {
     try {
-      console.log('[face-api] Loading models from:', modelPath);
+      await faceapi.tf.ready();
+      console.log(`[face-api] Loading models from: ${modelPath} (tfjs ${faceapi.tf.version_core}, backend=${faceapi.tf.getBackend()})`);
       await Promise.all([
         faceapi.nets.ssdMobilenetv1.loadFromDisk(modelPath),
         faceapi.nets.faceLandmark68Net.loadFromDisk(modelPath),
